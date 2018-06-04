@@ -1,0 +1,41 @@
+extern crate brotli;
+
+struct User {
+    username: String,
+    count: u32,
+}
+
+impl User {
+    fn printName(&self){
+        println!("{}",self.username);
+    }
+}
+
+fn build_user(count: u32) -> User
+{
+    let original_user = User {
+        username: String::from("test"),
+        count,
+    };
+
+    User {
+        count: 42,
+        ..original_user
+    }
+}
+
+fn main() {
+    use std::io;
+    use std::io::{Write};
+    let stdout = &mut io::stdout();
+    let mut writer = brotli::CompressorWriter::new(
+    stdout,
+    4096,
+    11,
+22);
+
+    let buf = [0u8; 4096];
+
+    writer.write_all(&buf);
+
+}

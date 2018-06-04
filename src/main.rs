@@ -1,49 +1,87 @@
-struct User {
-    username: String,
-    count: u32,
+extern crate brotli;
+//use std::io;
+use std::io::{Write, Read};
+use std::fs::File;
+
+struct PrintAsDecimal {
+
 }
 
-impl User {
-    fn printName(&self){
-        println!("{}",self.username);
+impl Write for PrintAsDecimal {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+        for x in buf
+        {
+            println!("{}", x);
+        }
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> Result<(), std::io::Error> {
+        Ok(())
     }
 }
 
-fn build_user(count: u32) -> User
-{
-    let original_user = User {
-        username: String::from("test"),
-        count,
-    };
-    
-    User {
-        count: 42,
-        ..original_user
+impl Read for PrintAsDecimal {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        let size = buf.len();
+
+        for x in buf
+        {
+            println!("{}", x);
+        }
+
+        Ok(size)
     }
 }
 
 fn main() {
-    println!("Hello, world!");
-    let taishou_a = User {
-    username: String::from("myname"),
-    count: 4,
-    };
-    
-    let taishou_b = build_user(1234);
-    
-    println!("count:{} username:{}", taishou_a.count, taishou_a.username);
-    
-    println!("count:{} username:{}", taishou_b.count, taishou_b.username);
+    let filename = "compressed.brotli";
+    let mut buf = [0u8; 4096];
 
-    taishou_a.printName();
-
-    let mut x = Some(5);
-    if 1 == 1
+    for x in 0..4096
     {
-        x = Some(1234);
+        buf[x] = x as u8;
     }
-    else {
-        x = None;
+
+
+        let simple_output = PrintAsDecimal {};
+/*
+    //let stdout = &mut io::stdout();
+    let mut writer = brotli::CompressorWriter::new(
+    simple_output,
+    4096,
+    11,
+22);
+
+
+    writer.write_all(&buf).unwrap();*/
+
+
+
+    //write compressed data to file
+/*    let mut f = File::create(filename).expect("Cannot create file");
+    let mut writer = brotli::CompressorWriter::new(
+    f,
+    4096,
+    11,
+    22);
+
+    writer.write(&buf).unwrap();*/
+
+    //read compressed file
+    let mut f = File::open(filename).expect("Cannot open file");
+    let mut reader = brotli::Decompressor::new(
+    f,
+    4096);
+
+
+    //reader.read(&simple_output);
+    let mut buf = [0u8; 4096];
+    reader.read(&mut buf);
+
+    for x in buf.iter()
+    {
+        println!("{}", x);
     }
 
 
