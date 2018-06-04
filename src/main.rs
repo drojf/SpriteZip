@@ -3,6 +3,12 @@ struct User {
     count: u32,
 }
 
+impl User {
+    fn printName(&self){
+        println!("{}",self.username);
+    }
+}
+
 fn build_user(count: u32) -> User
 {
     let original_user = User {
@@ -27,5 +33,19 @@ fn main() {
     
     println!("count:{} username:{}", taishou_a.count, taishou_a.username);
     
-        println!("count:{} username:{}", taishou_b.count, taishou_b.username);
+    println!("count:{} username:{}", taishou_b.count, taishou_b.username);
+
+    taishou_a.printName();
+
+    let mut x = Some(5);
+    if 1 == 1
+    {
+        x = Some(1234);
+    }
+    else {
+        x = None;
+    }
+
+
+
 }
