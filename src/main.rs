@@ -73,8 +73,16 @@ fn compress_data(iter : Iter<u8>)
     }
 }
 
-
 fn main() {
+    let file_name_no_ext = "compressed_image";
+
+    let f = File::create([file_name_no_ext, ".brotli"].concat()).expect("Cannot create file");
+
+    let mut compressor = brotli::CompressorWriter::new(
+    f,
+    4096,
+    11,//11,
+    22);
 
     let debug_mode = true;
 
@@ -94,10 +102,6 @@ fn main() {
     let img2 = img2_dyn.as_mut_rgba8().unwrap();
 
     {
-        //let subimage = imageops::crop(&mut img, 0, 0, 50, 50);
-        //let mut testimage = img.to_rgba();
-        //let mut testimage = img1.as_mut_rgba8().unwrap();
-        //let mut img2mut =
         println!("Subtracting two images");
         for (x, y, pixel) in img1.enumerate_pixels_mut() {
             let other_pixel = img2.get_pixel(x,y);
@@ -115,10 +119,15 @@ fn main() {
             }
         }
 
-        println!("Saving file");
-        img1.save("test2.png").unwrap();
+        println!("Saving .png");
+        img1.save([file_name_no_ext, ".png"].concat()).unwrap();
+
+        println!("Compressing...");
+        for val in img1.iter()
+        {
+            compressor.write(&[*val]);
+        }
         println!("Finished.");
-        compress_data(img1.iter());
     }
 
     // The dimensions method returns the images width and height.
