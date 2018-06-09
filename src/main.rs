@@ -1,9 +1,13 @@
 extern crate brotli;
+extern crate image;
+
 //use std::io;
 use std::io::{Write, Read};
 use std::fs::File;
 
-struct PrintAsDecimal {
+use image::GenericImage;
+
+/*struct PrintAsDecimal {
 
 }
 
@@ -32,9 +36,12 @@ impl Read for PrintAsDecimal {
 
         Ok(size)
     }
-}
+}*/
 
-fn main() {
+fn compression_test() -> ()
+{
+    let compress = false;
+
     let filename = "compressed.brotli";
     let mut buf = [0u8; 4096];
 
@@ -43,47 +50,57 @@ fn main() {
         buf[x] = x as u8;
     }
 
-
-        let simple_output = PrintAsDecimal {};
-/*
-    //let stdout = &mut io::stdout();
-    let mut writer = brotli::CompressorWriter::new(
-    simple_output,
-    4096,
-    11,
-22);
-
-
-    writer.write_all(&buf).unwrap();*/
-
-
-
     //write compressed data to file
-/*    let mut f = File::create(filename).expect("Cannot create file");
-    let mut writer = brotli::CompressorWriter::new(
-    f,
-    4096,
-    11,
-    22);
-
-    writer.write(&buf).unwrap();*/
-
-    //read compressed file
-    let mut f = File::open(filename).expect("Cannot open file");
-    let mut reader = brotli::Decompressor::new(
-    f,
-    4096);
-
-
-    //reader.read(&simple_output);
-    let mut buf = [0u8; 4096];
-    reader.read(&mut buf);
-
-    for x in buf.iter()
+    if compress
     {
-        println!("{}", x);
+        let f = File::create(filename).expect("Cannot create file");
+        let mut writer = brotli::CompressorWriter::new(
+            f,
+            4096,
+            11,
+            22);
+
+        writer.write(&buf).unwrap();
+    }
+    else
+    {
+        //read compressed file
+        let f = File::open(filename).expect("Cannot open file");
+        let mut reader = brotli::Decompressor::new(
+        f,
+        4096);
+
+
+        //reader.read(&simple_output);
+        let mut buf = [0u8; 4096];
+        reader.read(&mut buf).unwrap();
+
+        for x in buf.iter()
+        {
+            println!("{}", x);
+        }
     }
 
+}
+
+fn main() {
+    if false
+    {
+        compression_test();
+    }
+
+        // Use the open function to load an image from a Path.
+    // ```open``` returns a `DynamicImage` on success.
+    let img = image::open("test.png").unwrap();
+
+    // The dimensions method returns the images width and height.
+    println!("dimensions {:?}", img.dimensions());
+
+    // The color method returns the image's `ColorType`.
+    println!("{:?}", img.color());
+
+    // Write the contents of this image to the Writer in PNG format.
+    img.save("test2.png").unwrap();
 
 
 }
