@@ -1,9 +1,12 @@
 extern crate brotli;
 extern crate image;
+extern crate core;
 
 //use std::io;
 use std::io::{Write, Read};
 use std::fs::File;
+use core::slice::Iter;
+
 
 use image::{GenericImage, imageops};
 
@@ -49,10 +52,32 @@ fn compression_test() -> ()
             println!("{}", x);
         }
     }
-
 }
 
+//not sure if the iterator is better than feeding in the entire buffer,
+//but it seems easier to pass the data around this way...
+fn compress_data(iter : Iter<u8>)
+{
+    let filename = "compressed_image.brotli";
+
+    let f = File::create(filename).expect("Cannot create file");
+    let mut writer = brotli::CompressorWriter::new(
+        f,
+        4096,
+        11,//11,
+        22);
+
+    for val in iter
+    {
+        writer.write(&[*val]).unwrap();
+    }
+}
+
+
 fn main() {
+
+    let debug_mode = true;
+
     if false
     {
         compression_test();
@@ -60,22 +85,42 @@ fn main() {
 
     // Use the open function to load an image from a Path.
     // ```open``` returns a `DynamicImage` on success.
-    let mut img = image::open("test.png").unwrap();
-    
+    println!("Load img1");
+    let mut img1_dyn = image::open("1.png").unwrap();
+    println!("Load img2");
+    let mut img2_dyn = image::open("2.png").unwrap();
+
+    let img1 = img1_dyn.as_mut_rgba8().unwrap();
+    let img2 = img2_dyn.as_mut_rgba8().unwrap();
+
     {
         //let subimage = imageops::crop(&mut img, 0, 0, 50, 50);
-        let mut testimage = img.to_rgba();
-        for (x, y, pixel) in testimage.enumerate_pixels_mut() {
+        //let mut testimage = img.to_rgba();
+        //let mut testimage = img1.as_mut_rgba8().unwrap();
+        //let mut img2mut =
+        println!("Subtracting two images");
+        for (x, y, pixel) in img1.enumerate_pixels_mut() {
+            let other_pixel = img2.get_pixel(x,y);
+
             *pixel = image::Rgba([
-                0u8.wrapping_sub(pixel[0]),
-                0u8.wrapping_sub(pixel[1]),
-                0u8.wrapping_sub(pixel[2]),
-                pixel[3],
+                other_pixel[0].wrapping_sub(pixel[0]),
+                other_pixel[1].wrapping_sub(pixel[1]),
+                other_pixel[2].wrapping_sub(pixel[2]),
+                other_pixel[3].wrapping_sub(pixel[3]),
             ]);
+
+            if debug_mode
+            {
+                pixel[3] = 255;
+            }
         }
 
-        testimage.save("test2.png").unwrap();
+        println!("Saving file");
+        img1.save("test2.png").unwrap();
+        println!("Finished.");
+        compress_data(img1.iter());
     }
+
     // The dimensions method returns the images width and height.
     //println!("dimensions {:?}", img.dimensions());
 
