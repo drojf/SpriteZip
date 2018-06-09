@@ -6,3 +6,4 @@ authors = ["Daniel Wong <drojfjord@gmail.com>"]
 [dependencies]
 image = "*"
 brotli = "2.2.1"
+time = "*"
