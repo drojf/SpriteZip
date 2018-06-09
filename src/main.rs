@@ -5,38 +5,7 @@ extern crate image;
 use std::io::{Write, Read};
 use std::fs::File;
 
-use image::GenericImage;
-
-/*struct PrintAsDecimal {
-
-}
-
-impl Write for PrintAsDecimal {
-    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
-        for x in buf
-        {
-            println!("{}", x);
-        }
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> Result<(), std::io::Error> {
-        Ok(())
-    }
-}
-
-impl Read for PrintAsDecimal {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
-        let size = buf.len();
-
-        for x in buf
-        {
-            println!("{}", x);
-        }
-
-        Ok(size)
-    }
-}*/
+use image::{GenericImage, imageops};
 
 fn compression_test() -> ()
 {
@@ -89,18 +58,31 @@ fn main() {
         compression_test();
     }
 
-        // Use the open function to load an image from a Path.
+    // Use the open function to load an image from a Path.
     // ```open``` returns a `DynamicImage` on success.
-    let img = image::open("test.png").unwrap();
+    let mut img = image::open("test.png").unwrap();
+    
+    {
+        //let subimage = imageops::crop(&mut img, 0, 0, 50, 50);
+        let mut testimage = img.to_rgba();
+        for (x, y, pixel) in testimage.enumerate_pixels_mut() {
+            *pixel = image::Rgba([
+                0u8.wrapping_sub(pixel[0]),
+                0u8.wrapping_sub(pixel[1]),
+                0u8.wrapping_sub(pixel[2]),
+                pixel[3],
+            ]);
+        }
 
+        testimage.save("test2.png").unwrap();
+    }
     // The dimensions method returns the images width and height.
-    println!("dimensions {:?}", img.dimensions());
+    //println!("dimensions {:?}", img.dimensions());
 
     // The color method returns the image's `ColorType`.
-    println!("{:?}", img.color());
+    //println!("{:?}", img.color());
 
     // Write the contents of this image to the Writer in PNG format.
-    img.save("test2.png").unwrap();
-
+    //img.save("test2.png").unwrap();
 
 }

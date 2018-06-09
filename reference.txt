@@ -1,5 +1,36 @@
 extern crate brotli;
 
+struct PrintAsDecimal {
+
+}
+
+impl Write for PrintAsDecimal {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+        for x in buf
+        {
+            println!("{}", x);
+        }
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> Result<(), std::io::Error> {
+        Ok(())
+    }
+}
+
+impl Read for PrintAsDecimal {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        let size = buf.len();
+
+        for x in buf
+        {
+            println!("{}", x);
+        }
+
+        Ok(size)
+    }
+}
+
 struct User {
     username: String,
     count: u32,
