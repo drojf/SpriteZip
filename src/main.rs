@@ -2,6 +2,7 @@ extern crate brotli;
 extern crate image;
 extern crate core;
 extern crate time;
+extern crate walkdir;
 
 use std::io::{Write, Read};
 use std::fs::File;
@@ -10,6 +11,8 @@ use time::PreciseTime;
 
 
 use image::{GenericImage, imageops};
+
+use walkdir::WalkDir;
 
 fn compression_test() -> ()
 {
@@ -75,6 +78,45 @@ fn compress_data(iter : Iter<u8>)
 }
 
 fn main() {
+
+    //ignore directories
+    //TODO: only open .png files
+    //let test_iter = WalkDir::new("input_images").into_iter();//.filter(|ref mut x| x.unwrap().file_type().is_file()); // todo: figure out how this works
+    //let other_iter = test_iter.filter(|x| x.clone().unwrap().file_type().is_file());
+    //let other_iter = test_iter.filter(|x| x.unwrap().clone().file_type().is_file()
+
+    //let a = test_iter.next().unwrap().unwrap();
+    //let b = a.file_type().is_file();
+
+    /*let firstItem = test_iter.next().unwrap().unwrap();
+    println!("First item: {}", firstItem.path().display());
+
+
+    for entry in test_iter {
+
+        println!("{}", entry.unwrap().path().display());
+    }*/
+
+    let test_iter = WalkDir::new("input_images");
+    let mut count = 0;
+    for entry in test_iter {
+
+        let ent = entry.unwrap();
+
+        if ent.file_type().is_dir() {
+            continue;
+        }
+
+        if count == 0
+        {
+            println!("{}", ent.path().display());
+        }
+        else
+        {
+             println!("first_item: {}", ent.path().display());
+        }
+    }
+
     let file_name_no_ext = "compressed_image";
 
     let f = File::create([file_name_no_ext, ".brotli"].concat()).expect("Cannot create file");

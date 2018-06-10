@@ -7,3 +7,4 @@ authors = ["Daniel Wong <drojfjord@gmail.com>"]
 image = "*"
 brotli = "2.2.1"
 time = "*"
+walkdir = "*"
