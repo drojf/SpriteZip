@@ -77,25 +77,47 @@ fn compress_data(iter : Iter<u8>)
     }
 }
 
+fn SubtractTwoImages(img1_dyn : &image::DynamicImage, img2_dyn : &image::DynamicImage, debug_mode : bool)
+{
+       /* let img1 = img1_dyn.as_mut_rgba8().unwrap();
+        let img2 = img2_dyn.as_mut_rgba8().unwrap();
+
+        println!("Subtracting two images");
+        for (x, y, pixel) in img1.enumerate_pixels_mut() {
+            let other_pixel = img2.get_pixel(x,y);
+
+            *pixel = image::Rgba([
+                other_pixel[0].wrapping_sub(pixel[0]),
+                other_pixel[1].wrapping_sub(pixel[1]),
+                other_pixel[2].wrapping_sub(pixel[2]),
+                other_pixel[3].wrapping_sub(pixel[3]),
+            ]);
+
+            if debug_mode
+            {
+                pixel[3] = 255;
+            }
+        }*/
+}
+
 fn main() {
+    let debug_mode = true;
 
-    //ignore directories
-    //TODO: only open .png files
-    //let test_iter = WalkDir::new("input_images").into_iter();//.filter(|ref mut x| x.unwrap().file_type().is_file()); // todo: figure out how this works
-    //let other_iter = test_iter.filter(|x| x.clone().unwrap().file_type().is_file());
-    //let other_iter = test_iter.filter(|x| x.unwrap().clone().file_type().is_file()
+    let file_name_no_ext = "compressed_image";
+    let f = File::create([file_name_no_ext, ".brotli"].concat()).expect("Cannot create file");
 
-    //let a = test_iter.next().unwrap().unwrap();
-    //let b = a.file_type().is_file();
+    let mut compressor = brotli::CompressorWriter::new(
+    f,
+    4096,
+    9,//11, //9 seems to be a good tradeoff...changing q doesn't seem to make much diff though?
+    22);
 
-    /*let firstItem = test_iter.next().unwrap().unwrap();
-    println!("First item: {}", firstItem.path().display());
+    let mut img1_dyn_some = None;
+    let mut img2_dyn_some = None;
 
+    println!("Begin scanning for images");
 
-    for entry in test_iter {
-
-        println!("{}", entry.unwrap().path().display());
-    }*/
+    //TODO: check that input_images directory exists before scanning it.
 
     let test_iter = WalkDir::new("input_images");
     let mut count = 0;
@@ -109,34 +131,57 @@ fn main() {
 
         if count == 0
         {
-            println!("{}", ent.path().display());
+            println!("Scan Image1");
+            println!("first_item: {}", ent.path().display());
+            img1_dyn_some = Some(image::open(ent.path()).unwrap());
+            //let mut img1_dyn = image::open("1.png").unwrap();
+            //img1 = Some(img1_dyn.as_mut_rgba8().unwrap());
         }
         else
         {
-             println!("first_item: {}", ent.path().display());
+            println!("Scan Image2");
+            println!("{}", ent.path().display());
+            img2_dyn_some = Some(image::open(ent.path()).unwrap());
+            //let mut img2_dyn = image::open("2.png").unwrap();
+            //img2 = Some(img2_dyn.as_mut_rgba8().unwrap());
+            {
+                //SubtractTwoImages(&img1.unwrap(), &img2.unwrap(), true);
+            }
+            //img1 = img2;
+            let mut img1_dyn = img1_dyn_some.unwrap();
+            let mut img2_dyn = img2_dyn_some.unwrap();
+
+            let img1 = img1_dyn.as_mut_rgba8().unwrap();
+            let img2 = img2_dyn.as_mut_rgba8().unwrap();
+
+            println!("Subtracting two images");
+            for (x, y, pixel) in img1.enumerate_pixels_mut() {
+                let other_pixel = img2.get_pixel(x,y);
+
+                *pixel = image::Rgba([
+                    other_pixel[0].wrapping_sub(pixel[0]),
+                    other_pixel[1].wrapping_sub(pixel[1]),
+                    other_pixel[2].wrapping_sub(pixel[2]),
+                    other_pixel[3].wrapping_sub(pixel[3]),
+                ]);
+
+                if debug_mode
+                {
+                    pixel[3] = 255;
+                }
+            }
+
         }
     }
 
     let file_name_no_ext = "compressed_image";
 
-    let f = File::create([file_name_no_ext, ".brotli"].concat()).expect("Cannot create file");
-
-    let mut compressor = brotli::CompressorWriter::new(
-    f,
-    4096,
-    9,//11, //9 seems to be a good tradeoff...changing q doesn't seem to make much diff though?
-    22);
 
     let debug_mode = true;
 
-    if false
-    {
-        compression_test();
-    }
-
     // Use the open function to load an image from a Path.
     // ```open``` returns a `DynamicImage` on success.
-    println!("Load img1");
+    /*println!("Load img1");
     let mut img1_dyn = image::open("1.png").unwrap();
     println!("Load img2");
     let mut img2_dyn = image::open("2.png").unwrap();
@@ -184,7 +229,7 @@ fn main() {
         println!("Brotli compression took {} seconds", brotli_time);
         println!("Brotli is {} times slower", brotli_time.num_milliseconds() / png_time.num_milliseconds());
 
-    }
+    }*/
 
 
 
