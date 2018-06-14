@@ -48,6 +48,8 @@ fn main() {
     let mut count = 0;
     for entry in test_iter
     {
+        println!("\nProcessing image {}", count);
+
         let ent = entry.unwrap();
 
         let file_name_no_ext = ent.path().file_stem().unwrap().to_str().unwrap();//ent.path();
@@ -59,28 +61,21 @@ fn main() {
         let save_path = [file_name_no_ext, ".png"].concat();
         println!("Will save image to: {}", save_path);
 
+        let img_dyn = image::open(ent.path()).unwrap();
+        let img = img_dyn.as_rgba8().unwrap();
+
         if count == 0 //first image
         {
             println!("Scan Image1");
             println!("first_item: {}", ent.path().display());
 
-            let img_dyn = image::open(ent.path()).unwrap();
-            let img = img_dyn.as_rgba8().unwrap();
-
             //for first image, just copy image onto the canvas
             canvas.copy_from(img, 0, 0);
-
-            //compress/save image
-            canvas.save(save_path).unwrap();
         }
-        else //any subsequent image
+        else //for all other images, subtract image
         {
             println!("Scan Image2");
             println!("{}", ent.path().display());
-
-            //for all other images, subtract image, then copy over image
-            let img_dyn = image::open(ent.path()).unwrap();
-            let img = img_dyn.as_rgba8().unwrap();
 
             //subtract the image
             for (x, y, pixel) in img.enumerate_pixels()
@@ -97,25 +92,29 @@ fn main() {
 
                 *canvas_pixel = image::Rgba(new_pixel);
             }
-
-            canvas.save(save_path).unwrap();
-
-            //try compressing image
-            {
-                let canvas_as_raw = canvas.into_raw();
-
-                let brotli_start = PreciseTime::now();
-                compressor.write(&canvas_as_raw).unwrap();
-                let brotli_end = PreciseTime::now();
-                println!("Brotli compression took {} seconds", brotli_start.to(brotli_end));
-            }
-
-            //clear canvas (there must be a better way to do this?
-            canvas = RgbaImage::new(canvas_width, canvas_height);
-
-            //copy the just subtracted image onto canvas
-            canvas.copy_from(img, 0, 0);
         }
+
+        //save diff image as png for debugging reasons
+        canvas.save(save_path).unwrap();
+
+        // Compress the the diff image (or 'normal' image for first image)
+        // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
+        // However subsequent RgbaImage::new assigns a new value to the canvas each iteration
+        {
+            let canvas_as_raw = canvas.into_raw();
+
+            let brotli_start = PreciseTime::now();
+            compressor.write(&canvas_as_raw).unwrap();
+            let brotli_end = PreciseTime::now();
+            println!("Brotli compression took {} seconds", brotli_start.to(brotli_end));
+        }
+
+        //clear canvas (there must be a better way to do this?
+        canvas = RgbaImage::new(canvas_width, canvas_height);
+
+        //copy the originalimage onto canvas for next iteration
+        canvas.copy_from(img, 0, 0);
+
 
         count += 1;
     }
