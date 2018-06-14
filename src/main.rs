@@ -16,6 +16,8 @@ use time::PreciseTime;
 use image::{RgbaImage, GenericImage};
 use walkdir::WalkDir;
 
+// TODO: crop diff'd images  so that not so much data needs to be compressed?
+
 /*fn SubtractTwoImages(img1_dyn : &image::DynamicImage, img2_dyn : &image::DynamicImage, debug_mode : bool)
 {
 }*/
@@ -54,32 +56,31 @@ fn main() {
             continue;
         }
 
-        if count == 0
+        let save_path = [file_name_no_ext, ".png"].concat();
+        println!("Will save image to: {}", save_path);
+
+        let img_dyn = image::open(ent.path()).unwrap();
+        let img = img_dyn.as_rgba8().unwrap();
+
+        if count == 0 //first image
         {
             println!("Scan Image1");
             println!("first_item: {}", ent.path().display());
 
-            let img_dyn = image::open(ent.path()).unwrap();
-            let img = img_dyn.as_rgba8().unwrap();
-            for (x, y, pixel) in img.enumerate_pixels()
-            {
-                //for now just copy in the pixels
-                canvas.put_pixel(x,y, *pixel);
-            }
+            //for first image, just copy image onto the canvas
+            canvas.copy_from(img, 0, 0);
         }
-        else
+        else //any subsequent image
         {
             println!("Scan Image2");
             println!("{}", ent.path().display());
 
-            //for all ohter images, subtract image, then copy over image
-            let img_dyn = image::open(ent.path()).unwrap();
-            let img = img_dyn.as_rgba8().unwrap();
+            //for all other images, subtract image
             for (x, y, pixel) in img.enumerate_pixels()
             {
                 let mut canvas_pixel = canvas.get_pixel_mut(x,y);
 
-                //TODO: use actal alpha value
+                //TODO: disable debug mode to use alpha value
                 let new_pixel = [
                     pixel[0] - canvas_pixel[0],
                     pixel[1] - canvas_pixel[1],
@@ -89,27 +90,29 @@ fn main() {
 
                 *canvas_pixel = image::Rgba(new_pixel);
             }
+        }
 
-            let save_path = [file_name_no_ext, ".png"].concat();
-            println!("Saving image to: {}", save_path);
-            canvas.save(save_path).unwrap();
+        canvas.save(save_path).unwrap();
 
-            //try compressing image
-            {
-                let canvas_as_raw = canvas.into_raw();
+        //try compressing image
+        {
+            let canvas_as_raw = canvas.into_raw();
 
-                let brotli_start = PreciseTime::now();
-                compressor.write(&canvas_as_raw).unwrap();
-                let brotli_end = PreciseTime::now();
-                println!("Brotli compression took {} seconds", brotli_start.to(brotli_end));
-            }
+            let brotli_start = PreciseTime::now();
+            compressor.write(&canvas_as_raw).unwrap();
+            let brotli_end = PreciseTime::now();
+            println!("Brotli compression took {} seconds", brotli_start.to(brotli_end));
+        }
 
+        if count != 0
+        {
             //clear canvas (there must be a better way to do this?
             canvas = RgbaImage::new(canvas_width, canvas_height);
 
             //copy the just subtracted image onto canvas
             canvas.copy_from(img, 0, 0);
         }
+
 
         count += 1;
     }
