@@ -64,34 +64,23 @@ fn main() {
         let img_dyn = image::open(ent.path()).unwrap();
         let img = img_dyn.as_rgba8().unwrap();
 
-        if count == 0 //first image
+        println!("{}", ent.path().display());
+
+        //subtract the image
+        for (x, y, pixel) in img.enumerate_pixels()
         {
-            println!("Scan Image1");
-            println!("first_item: {}", ent.path().display());
+            let mut canvas_pixel = canvas.get_pixel_mut(x,y);
 
-            //for first image, just copy image onto the canvas
-            canvas.copy_from(img, 0, 0);
-        }
-        else //for all other images, subtract image
-        {
-            println!("Scan Image2");
-            println!("{}", ent.path().display());
+            //TODO: disable debug mode to use alpha value
+            //must specify u8 to ensure wrapping occurs
+            let new_pixel : [u8; 4] = [
+                pixel[0].wrapping_sub(canvas_pixel[0]),
+                pixel[1].wrapping_sub(canvas_pixel[1]),
+                pixel[2].wrapping_sub(canvas_pixel[2]),
+                if debug_mode {255} else {pixel[3].wrapping_sub(canvas_pixel[3])},
+            ];
 
-            //subtract the image
-            for (x, y, pixel) in img.enumerate_pixels()
-            {
-                let mut canvas_pixel = canvas.get_pixel_mut(x,y);
-
-                //TODO: disable debug mode to use alpha value
-                let new_pixel = [
-                    pixel[0] - canvas_pixel[0],
-                    pixel[1] - canvas_pixel[1],
-                    pixel[2] - canvas_pixel[2],
-                    if debug_mode {255} else {pixel[3] - canvas_pixel[3]},
-                ];
-
-                *canvas_pixel = image::Rgba(new_pixel);
-            }
+            *canvas_pixel = image::Rgba(new_pixel);
         }
 
         //save diff image as png for debugging reasons
