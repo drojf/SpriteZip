@@ -23,13 +23,27 @@ use time::PreciseTime;
 use image::{RgbaImage, GenericImage};
 use walkdir::WalkDir;
 
-// TODO: crop diff'd images  so that not so much data needs to be compressed?
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+struct CompressedImageInfo {
+    start_index: usize,   //where in the compressed data stream the image starts
+    x: u32,             //where on the canvas the diff should be placed
+    y: u32,
+    diff_width: u32,     //the width and height of the diff image
+    diff_height: u32,
+    output_width: u32,   //the width and height of the reconstructed image
+    output_height: u32,
+}
 
-fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, debug_mode : bool)
+/*fn calculate_offset_to_bottom_center_image(canvas: &mut image::RgbaImage, img : &image::RgbaImage) -> (i32, i32)
+{
+}*/
+
+// TODO: crop diff'd images  so that not so much data needs to be compressed?
+fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, x_offset : u32, y_offset : u32, debug_mode : bool)
 {
     for (x, y, pixel) in img.enumerate_pixels()
     {
-        let mut canvas_pixel = canvas.get_pixel_mut(x,y);
+        let mut canvas_pixel = canvas.get_pixel_mut(x + x_offset, y + y_offset);
 
         //TODO: disable debug mode to use alpha value
         //must specify u8 to ensure wrapping occurs
@@ -54,6 +68,10 @@ where T: std::io::Write
 }
 
 fn main() {
+    let mut current_start_index : usize = 0;
+
+    let mut images_meta_info = Vec::new();
+
     let canvas_width = 3000;
     let canvas_height = 3000;
 
@@ -83,25 +101,47 @@ Warning: Debug mode is enabled - alpha channel will be ignored during subtractio
     let mut count = 0;
     for entry in test_iter
     {
-        println!("\nProcessing image {}", count);
-
         let ent = entry.unwrap();
-
-        let file_name_no_ext = ent.path().file_stem().unwrap().to_str().unwrap();//ent.path();
-
         if ent.file_type().is_dir() {
             continue;
         }
 
+        println!("\nProcessing Image {}: '{}'", count, ent.path().display());
+
+        let file_name_no_ext = ent.path().file_stem().unwrap().to_str().unwrap();
         let save_path = [file_name_no_ext, ".png"].concat();
-        println!("{}", ent.path().display());
         println!("Will save image to: {}", save_path);
 
         let img_dyn = image::open(ent.path()).unwrap();
         let img = img_dyn.as_rgba8().unwrap();
 
+        //TODO: check if input image is larger than the canvas
+
+        //Calculate image offset such that image is placed at the center bottom of the canvas.
+        let x_offset = (canvas.width() - img.width()) / 2;
+        let y_offset = canvas.height() - img.height();
+
         println!("Subtracting images");
-        subtract_image_from_canvas(&mut canvas, &img, debug_mode);
+        subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset, debug_mode);
+
+        //TODO: crop diff
+
+        //save meta info
+        let image_size = img.len();
+
+        images_meta_info.push(CompressedImageInfo{
+            start_index: current_start_index,   //where in the compressed data stream the image starts
+            x: x_offset,             //where on the canvas the diff should be placed (NEEDS UPDATE
+            y: y_offset,            //(NEEDS UPDATE
+            diff_width: img.width(),     //NEEDS UPDATE the width and height of the diff image
+            diff_height: img.height(),  // NEEDS UPDATE
+            output_width: img.width(),   //the width and height of the reconstructed image
+            output_height: img.height(),
+        });
+
+        current_start_index += image_size;
+
+        println!("Image size is {},  width is {} height is {}", image_size, img.width(), img.height());
 
         //save diff image as png for debugging reasons
         println!("Saving .png");
@@ -119,10 +159,15 @@ Warning: Debug mode is enabled - alpha channel will be ignored during subtractio
         canvas = RgbaImage::new(canvas_width, canvas_height);
 
         //copy the original image onto canvas for next iteration
-        canvas.copy_from(img, 0, 0);
+        canvas.copy_from(img, x_offset, y_offset);
 
 
         count += 1;
     }
+
+    //saving meta info
+    let serialized = serde_json::to_string(&images_meta_info).unwrap();
+    println!("serialized = {}", serialized);
+
 
 }
