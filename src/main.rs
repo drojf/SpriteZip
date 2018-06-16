@@ -1,3 +1,8 @@
+//Note: please run with --release (or higher optimization level), otherwise running program is way too slow.
+
+#[macro_use]
+extern crate serde_derive;
+
 //std crates
 extern crate core;
 extern crate time;
@@ -6,6 +11,8 @@ extern crate time;
 extern crate image;
 extern crate brotli;
 extern crate walkdir;
+extern crate serde;
+extern crate serde_json;
 
 //standard uses
 use std::io::{Write};
@@ -51,6 +58,10 @@ fn main() {
     let canvas_height = 3000;
 
     let debug_mode = true;
+    println!("-----------
+Warning: Debug mode is enabled - alpha channel will be ignored during subtraction.
+-----------
+    ");
 
     let f = File::create(["compressed_images", ".brotli"].concat()).expect("Cannot create file");
 
@@ -89,15 +100,19 @@ fn main() {
         let img_dyn = image::open(ent.path()).unwrap();
         let img = img_dyn.as_rgba8().unwrap();
 
+        println!("Subtracting images");
         subtract_image_from_canvas(&mut canvas, &img, debug_mode);
 
         //save diff image as png for debugging reasons
+        println!("Saving .png");
         canvas.save(save_path).unwrap();
 
         // Compress the the diff image (or 'normal' image for first image)
         // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
         // However subsequent RgbaImage::new assigns a new value to the canvas each iteration
         let canvas_as_raw = canvas.into_raw();
+
+        println!("Saving .brotli");
         save_brotli_image(&mut compressor, &canvas_as_raw);
 
         //clear canvas (there must be a better way to do this?
