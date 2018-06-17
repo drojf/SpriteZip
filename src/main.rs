@@ -34,24 +34,12 @@ struct CompressedImageInfo {
     output_height: u32,
 }
 
-/*fn calculate_offset_to_bottom_center_image(canvas: &mut image::RgbaImage, img : &image::RgbaImage) -> (i32, i32)
-{
-}*/
-
 struct CroppedImageBounds {
     x : u32,
     y : u32,
     width : u32,
     height : u32,
 }
-
-/*fn placeholder_crop_function(img: &image::RgbaImage, x_offset : u32, y_offset : u32, max_width : u32, max_height : u32) -> CroppedImageBounds
-{
-    CroppedImageBounds {
-        x: 0, y: 0,
-        width: img.width(), height: img.height(),
-    }
-}*/
 
 //TODO: cropped image cannot be bigger than two input images - can optimize for this
 fn crop_function(img: &image::RgbaImage, x_offset : u32, y_offset : u32, max_width : u32, max_height : u32) -> CroppedImageBounds
@@ -116,6 +104,7 @@ fn main() {
     let canvas_width = 3000;
     let canvas_height = 3000;
 
+    let crop_enabled = true;
     let debug_mode = true;
     if debug_mode {
         println!("-----------
@@ -171,19 +160,22 @@ will be forced to 255 for .png output
         subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset);
 
         //TODO: crop diff
-/*        let cropped_image_bounds = placeholder_crop_function(&canvas,
-                                                             x_offset, y_offset,
-                                                             img.width(), img.height());*/
-
         let cropped_image_bounds = crop_function(&canvas,
                                                      x_offset, y_offset,
                                                      img.width(), img.height());
 
         //Note: a copy occurs here, for simplicity, so that the cropped image can be saved/compressed
         // As the cropped diff is usually small, this shouldn't have much impact on performance
-        let cropped_image = image::imageops::crop(&mut canvas,
+        let cropped_image = if crop_enabled
+        {
+            image::imageops::crop(&mut canvas,
                               cropped_image_bounds.x, cropped_image_bounds.y,
-                              cropped_image_bounds.width, cropped_image_bounds.height).to_image();
+                              cropped_image_bounds.width, cropped_image_bounds.height).to_image()
+        }
+        else
+        {
+            canvas.clone()
+        };
 
         //save meta info
         let cropped_image_size = cropped_image.len();
@@ -227,10 +219,10 @@ will be forced to 255 for .png output
         // Compress the the diff image (or 'normal' image for first image)
         // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
         // However subsequent RgbaImage::new assigns a new value to the canvas each iteration
-        let canvas_as_raw = canvas.into_raw();
+        let cropped_image_as_raw = cropped_image.into_raw();
 
         println!("Saving .brotli");
-        save_brotli_image(&mut compressor, &canvas_as_raw);
+        save_brotli_image(&mut compressor, &cropped_image_as_raw);
 
         //clear canvas (there must be a better way to do this?
         canvas = RgbaImage::new(canvas_width, canvas_height);
