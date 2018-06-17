@@ -38,6 +38,47 @@ struct CompressedImageInfo {
 {
 }*/
 
+struct CroppedImageBounds {
+    x : u32,
+    y : u32,
+    width : u32,
+    height : u32,
+}
+
+/*fn placeholder_crop_function(img: &image::RgbaImage, x_offset : u32, y_offset : u32, max_width : u32, max_height : u32) -> CroppedImageBounds
+{
+    CroppedImageBounds {
+        x: 0, y: 0,
+        width: img.width(), height: img.height(),
+    }
+}*/
+
+//TODO: cropped image cannot be bigger than two input images - can optimize for this
+fn crop_function(img: &image::RgbaImage, x_offset : u32, y_offset : u32, max_width : u32, max_height : u32) -> CroppedImageBounds
+{
+    //TODO: figure out a better rusty way to do this
+    let mut x0 = x_offset + (max_width-1); //img.width();
+    let mut x1 = x_offset; //std::u32::MAX;
+    let mut y0 = y_offset + (max_height-1); //img.height();
+    let mut y1 = y_offset; //std::u32::MAX;
+
+    for (x, y, pixel) in img.enumerate_pixels()
+    {
+        if pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0 || pixel[3] != 0
+        {
+            x0 = std::cmp::min(x, x0);
+            y0 = std::cmp::min(y, y0);
+            x1 = std::cmp::max(x, x1);
+            y1 = std::cmp::max(y, y1);
+        }
+    }
+
+    CroppedImageBounds {
+        x: x0, y: y0,
+        width: x1-x0+1, height: y1-y0+1,
+    }
+}
+
 // TODO: crop diff'd images  so that not so much data needs to be compressed?
 fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, x_offset : u32, y_offset : u32, debug_mode : bool)
 {
@@ -75,11 +116,14 @@ fn main() {
     let canvas_width = 3000;
     let canvas_height = 3000;
 
-    let debug_mode = true;
-    println!("-----------
-Warning: Debug mode is enabled - alpha channel will be ignored during subtraction.
+    let debug_mode = false;
+    if debug_mode {
+        println!("-----------
+Warning: Debug mode is enabled - alpha channel
+will be ignored during subtraction.
 -----------
     ");
+    }
 
     let f = File::create(["compressed_images", ".brotli"].concat()).expect("Cannot create file");
 
@@ -115,6 +159,8 @@ Warning: Debug mode is enabled - alpha channel will be ignored during subtractio
         let img_dyn = image::open(ent.path()).unwrap();
         let img = img_dyn.as_rgba8().unwrap();
 
+        println!("Original Image width is {} height is {}", img.width(), img.height());
+
         //TODO: check if input image is larger than the canvas
 
         //Calculate image offset such that image is placed at the center bottom of the canvas.
@@ -125,23 +171,34 @@ Warning: Debug mode is enabled - alpha channel will be ignored during subtractio
         subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset, debug_mode);
 
         //TODO: crop diff
+/*        let cropped_image_bounds = placeholder_crop_function(&canvas,
+                                                             x_offset, y_offset,
+                                                             img.width(), img.height());*/
+
+        let cropped_image_bounds = crop_function(&canvas,
+                                                     x_offset, y_offset,
+                                                     img.width(), img.height());
+
+        let cropped_image = image::imageops::crop(&mut canvas,
+                              cropped_image_bounds.x, cropped_image_bounds.y,
+                              cropped_image_bounds.width, cropped_image_bounds.height).to_image();
 
         //save meta info
-        let image_size = img.len();
+        let cropped_image_size = cropped_image.len();
 
         images_meta_info.push(CompressedImageInfo{
             start_index: current_start_index,   //where in the compressed data stream the image starts
-            x: x_offset,             //where on the canvas the diff should be placed (NEEDS UPDATE
-            y: y_offset,            //(NEEDS UPDATE
-            diff_width: img.width(),     //NEEDS UPDATE the width and height of the diff image
-            diff_height: img.height(),  // NEEDS UPDATE
+            x: cropped_image_bounds.x,             //where on the canvas the diff should be placed (NEEDS UPDATE
+            y: cropped_image_bounds.y,            //(NEEDS UPDATE
+            diff_width: cropped_image_bounds.width,     //NEEDS UPDATE the width and height of the diff image
+            diff_height: cropped_image_bounds.height,  // NEEDS UPDATE
             output_width: img.width(),   //the width and height of the reconstructed image
             output_height: img.height(),
         });
 
-        current_start_index += image_size;
+        current_start_index += cropped_image_size;
 
-        println!("Image size is {},  width is {} height is {}", image_size, img.width(), img.height());
+        println!("Image size is {},  width is {} height is {}", cropped_image_size, cropped_image_bounds.width, cropped_image_bounds.height);
 
         //save diff image as png for debugging reasons
         println!("Saving .png");
