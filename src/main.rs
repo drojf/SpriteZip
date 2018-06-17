@@ -80,7 +80,7 @@ fn crop_function(img: &image::RgbaImage, x_offset : u32, y_offset : u32, max_wid
 }
 
 // TODO: crop diff'd images  so that not so much data needs to be compressed?
-fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, x_offset : u32, y_offset : u32, debug_mode : bool)
+fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, x_offset : u32, y_offset : u32)
 {
     for (x, y, pixel) in img.enumerate_pixels()
     {
@@ -92,7 +92,7 @@ fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaI
             pixel[0].wrapping_sub(canvas_pixel[0]),
             pixel[1].wrapping_sub(canvas_pixel[1]),
             pixel[2].wrapping_sub(canvas_pixel[2]),
-            if debug_mode {255} else {pixel[3].wrapping_sub(canvas_pixel[3])},
+            pixel[3].wrapping_sub(canvas_pixel[3]),
         ];
 
         *canvas_pixel = image::Rgba(new_pixel);
@@ -116,11 +116,11 @@ fn main() {
     let canvas_width = 3000;
     let canvas_height = 3000;
 
-    let debug_mode = false;
+    let debug_mode = true;
     if debug_mode {
         println!("-----------
 Warning: Debug mode is enabled - alpha channel
-will be ignored during subtraction.
+will be forced to 255 for .png output
 -----------
     ");
     }
@@ -168,7 +168,7 @@ will be ignored during subtraction.
         let y_offset = canvas.height() - img.height();
 
         println!("Subtracting images");
-        subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset, debug_mode);
+        subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset);
 
         //TODO: crop diff
 /*        let cropped_image_bounds = placeholder_crop_function(&canvas,
@@ -179,6 +179,8 @@ will be ignored during subtraction.
                                                      x_offset, y_offset,
                                                      img.width(), img.height());
 
+        //Note: a copy occurs here, for simplicity, so that the cropped image can be saved/compressed
+        // As the cropped diff is usually small, this shouldn't have much impact on performance
         let cropped_image = image::imageops::crop(&mut canvas,
                               cropped_image_bounds.x, cropped_image_bounds.y,
                               cropped_image_bounds.width, cropped_image_bounds.height).to_image();
@@ -202,7 +204,25 @@ will be ignored during subtraction.
 
         //save diff image as png for debugging reasons
         println!("Saving .png");
-        canvas.save(save_path).unwrap();
+        if debug_mode
+        {
+            let mut cropped_image_copy = cropped_image.clone();
+            for pixel in cropped_image_copy.pixels_mut()
+            {
+                *pixel = image::Rgba([
+                    pixel[0],
+                    pixel[1],
+                    pixel[2],
+                    255
+                ]);
+            }
+
+            cropped_image_copy.save(save_path).unwrap()
+        }
+        else
+        {
+            cropped_image.save(save_path).unwrap();
+        }
 
         // Compress the the diff image (or 'normal' image for first image)
         // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
