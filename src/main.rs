@@ -16,6 +16,7 @@ extern crate serde_json;
 
 //standard uses
 use std::io::{Write};
+use std::fs;
 use std::fs::File;
 use time::PreciseTime;
 
@@ -96,7 +97,9 @@ where T: std::io::Write
     println!("Brotli compression took {} seconds", brotli_start.to(brotli_end));
 }
 
-fn main() {
+//output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
+fn compress(brotli_archive_path : &str, metadata_path : &str)
+{
     let mut current_start_index : usize = 0;
 
     let mut images_meta_info = Vec::new();
@@ -114,7 +117,7 @@ will be forced to 255 for .png output
     ");
     }
 
-    let f = File::create(["compressed_images", ".brotli"].concat()).expect("Cannot create file");
+    let f = File::create(brotli_archive_path).expect("Cannot create file");
 
     let mut compressor = brotli::CompressorWriter::new(
     f,
@@ -237,6 +240,21 @@ will be forced to 255 for .png output
     //saving meta info
     let serialized = serde_json::to_string(&images_meta_info).unwrap();
     println!("serialized = {}", serialized);
+    fs::write(metadata_path, serialized).expect("Unable to write metadata file");
+}
 
+fn extract(brotli_archive_path : &str, metadata_path : &str) {
+    let data = fs::read(metadata_path).expect("Unable to read metadata file");
+    println!("{}", data.len());
+}
 
+fn main()
+{
+    let output_basename = "compressed_images";
+    let brotli_archive_path = [output_basename, ".brotli"].concat();
+    let metadata_path = [output_basename, ".brotli"].concat();
+
+    compress(&brotli_archive_path, &metadata_path);
+
+    extract(&brotli_archive_path, &metadata_path);
 }
