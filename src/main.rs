@@ -21,7 +21,7 @@ use std::fs::File;
 use time::PreciseTime;
 
 //non-standard use
-use image::{RgbaImage, GenericImage};
+use image::{RgbImage, RgbaImage, GenericImage};
 use walkdir::WalkDir;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
@@ -95,6 +95,52 @@ where T: std::io::Write
     compressor.write(canvas_as_raw).unwrap();
     let brotli_end = PreciseTime::now();
     println!("Brotli compression took {} seconds", brotli_start.to(brotli_end));
+}
+
+fn convert_to_onscripter_alphablend(filepath : &str, save_path : &str)
+{
+    let img_dyn = image::open(filepath).unwrap();
+    let img = img_dyn.as_rgba8().unwrap();
+
+    //create new image whose size is twice the width of the original image, with no alpha channel
+    let mut rgb_left_alpha_right = RgbImage::new(img.width() * 2, img.height());
+
+    //save color image to lhs
+    for (x, y, pixel) in img.enumerate_pixels()
+    {
+        rgb_left_alpha_right.put_pixel(x, y, image::Rgb([pixel[0], pixel[1], pixel[2]]));
+    }
+
+    //save alpha image to rhs
+    for (x, y, pixel) in img.enumerate_pixels()
+    {
+        rgb_left_alpha_right.put_pixel(x+img.width(), y, image::Rgb([pixel[3], pixel[3], pixel[3]]));
+    }
+
+    //save new_image
+    rgb_left_alpha_right.save(save_path);
+}
+
+//TODO: output to 'output_dir' instead of same directory.
+fn convert_folder_to_alphablend()
+{
+    let recursive_path_iter = WalkDir::new("input_images");
+    for entry in recursive_path_iter
+    {
+        let ent = entry.unwrap();
+        if ent.file_type().is_dir() {
+            continue;
+        }
+
+        println!("\nProcessing Image: '{}'", ent.path().display());
+
+        let file_name_no_ext = ent.path().file_stem().unwrap().to_str().unwrap();
+        let save_path = [file_name_no_ext, ".png"].concat();
+        println!("Will save image to: {}", save_path);
+
+        convert_to_onscripter_alphablend(ent.path().to_str().unwrap(), &save_path);
+
+    }
 }
 
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
@@ -245,16 +291,39 @@ will be forced to 255 for .png output
 
 fn extract(brotli_archive_path : &str, metadata_path : &str) {
     let data = fs::read(metadata_path).expect("Unable to read metadata file");
-    println!("{}", data.len());
+
+    println!("Loaded metadata file: {}", data.len());
+
+    //unserialize the metadata file
+
+    //open the brotli file for reading
+
+    //initialize the canvas
+
+    //for each image
+        //partially decompress the brotli file
+        //add the diff to the canvas at the specified coordinates
+        //get the correct crop of the canvas (using metadata) as a new image
+        //save the reconstructed image as .png file
 }
 
 fn main()
 {
-    let output_basename = "compressed_images";
-    let brotli_archive_path = [output_basename, ".brotli"].concat();
-    let metadata_path = [output_basename, ".brotli"].concat();
+    let do_brotli_compression = true;
+    let do_onscripter_alphablend = false;
 
-    compress(&brotli_archive_path, &metadata_path);
+    if do_brotli_compression
+    {
+        let output_basename = "compressed_images";
+        let brotli_archive_path = [output_basename, ".brotli"].concat();
+        let metadata_path = [output_basename, ".brotli"].concat();
 
-    extract(&brotli_archive_path, &metadata_path);
+        compress(&brotli_archive_path, &metadata_path);
+
+        extract(&brotli_archive_path, &metadata_path);
+    }
+    else if do_onscripter_alphablend
+    {
+        convert_folder_to_alphablend();
+    }
 }
