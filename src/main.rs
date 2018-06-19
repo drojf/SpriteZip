@@ -15,7 +15,9 @@ extern crate serde;
 extern crate serde_json;
 
 //standard uses
+use std::path::{Path};
 use std::io::{Write};
+use std::io;
 use std::fs;
 use std::fs::File;
 use time::PreciseTime;
@@ -118,12 +120,13 @@ fn convert_to_onscripter_alphablend(filepath : &str, save_path : &str)
     }
 
     //save new_image
-    rgb_left_alpha_right.save(save_path);
+    rgb_left_alpha_right.save(save_path).unwrap();
 }
 
 //TODO: output to 'output_dir' instead of same directory.
-fn convert_folder_to_alphablend()
+fn convert_folder_to_alphablend() -> u32
 {
+    let mut count = 0;
     let recursive_path_iter = WalkDir::new("input_images");
     for entry in recursive_path_iter
     {
@@ -134,13 +137,28 @@ fn convert_folder_to_alphablend()
 
         println!("\nProcessing Image: '{}'", ent.path().display());
 
-        let file_name_no_ext = ent.path().file_stem().unwrap().to_str().unwrap();
-        let save_path = [file_name_no_ext, ".png"].concat();
+        let path_with_input_images_as_root = ent.path().strip_prefix("input_images").unwrap();
+
+        println!("path with input images as root: {}", path_with_input_images_as_root.to_str().unwrap());
+
+        let output_path = Path::new("output_images").join(path_with_input_images_as_root);
+        println!("output path: {}", output_path.to_str().unwrap());
+
+        let save_path = output_path.to_str().unwrap();
+        //let file_name_no_ext = ent.path().file_stem().unwrap().to_str().unwrap();
+        //let save_path = [file_name_no_ext, ".png"].concat();
+
         println!("Will save image to: {}", save_path);
+
+        //create the save directory if it doesn't already exist:
+        std::fs::create_dir_all(output_path.parent().unwrap()).unwrap();
 
         convert_to_onscripter_alphablend(ent.path().to_str().unwrap(), &save_path);
 
+        count += 1;
     }
+
+    count
 }
 
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
@@ -307,10 +325,20 @@ fn extract(brotli_archive_path : &str, metadata_path : &str) {
         //save the reconstructed image as .png file
 }
 
+fn pause()
+{
+    let mut input = String::new();
+    io::stdin().read_line(&mut input);
+}
+
 fn main()
 {
-    let do_brotli_compression = true;
-    let do_onscripter_alphablend = false;
+    //create input images folder if it doesn't already exist:
+    let input_path = Path::new("input_images");
+    std::fs::create_dir_all(input_path).unwrap();
+
+    let do_brotli_compression = false;
+    let do_onscripter_alphablend = true;
 
     if do_brotli_compression
     {
@@ -324,6 +352,18 @@ fn main()
     }
     else if do_onscripter_alphablend
     {
-        convert_folder_to_alphablend();
+        let num_converted = convert_folder_to_alphablend();
+
+        if num_converted == 0
+        {
+            println!("Please place .png files/folders in the 'input_images' directory. They will be converted and placed in the 'output_images' directory.");
+            println!("Press any key to continue...");
+            pause();
+            return;
+        }
+
     }
+    
+    println!("All done. Press enter to continue...");
+    pause();
 }
