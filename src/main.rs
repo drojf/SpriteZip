@@ -113,10 +113,11 @@ fn convert_to_onscripter_alphablend(filepath : &str, save_path : &str)
         rgb_left_alpha_right.put_pixel(x, y, image::Rgb([pixel[0], pixel[1], pixel[2]]));
     }
 
-    //save alpha image to rhs
+    //save alpha image to rhs (NOTE: is inverted from normal - black indicates transparent, white indicates solid)
     for (x, y, pixel) in img.enumerate_pixels()
     {
-        rgb_left_alpha_right.put_pixel(x+img.width(), y, image::Rgb([pixel[3], pixel[3], pixel[3]]));
+        let value = 0xFF - pixel[3];
+        rgb_left_alpha_right.put_pixel(x+img.width(), y, image::Rgb([value, value, value]));
     }
 
     //save new_image
