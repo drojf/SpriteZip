@@ -1,3 +1,7 @@
 
 /target
 **/*.rs.bk
+/input_images
+/output_images
+*.png
+*.brotli
