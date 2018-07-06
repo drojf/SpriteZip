@@ -47,16 +47,19 @@ fn main()
     std::fs::create_dir_all(input_path).unwrap();
 
     let do_brotli_compression = false;
-    let do_onscripter_alphablend = true;
+    let do_brotli_extract = true;
+    let do_onscripter_alphablend = false;
+
+    let output_basename = "compressed_images";
+    let brotli_archive_path = format!("{}.brotli", output_basename);
+    let metadata_path = format!("{}.metadata", output_basename);
 
     if do_brotli_compression
     {
-        let output_basename = "compressed_images";
-        let brotli_archive_path = format!("{}.brotli", output_basename);
-        let metadata_path = format!("{}.metadata", output_basename);
-
         compress_path(&brotli_archive_path, &metadata_path);
-
+    }
+    else if do_brotli_extract
+    {
         extract_archive(&brotli_archive_path, &metadata_path);
     }
     else if do_onscripter_alphablend

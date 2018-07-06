@@ -22,8 +22,12 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
     let canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
 
     //for each image
+    for metadata in metadata_list
+    {
+        println!("{:?}", metadata);
         //partially decompress the brotli file
         //add the diff to the canvas at the specified coordinates
         //get the correct crop of the canvas (using metadata) as a new image
         //save the reconstructed image as .png file
+    }
 }
