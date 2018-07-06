@@ -8,6 +8,7 @@ use image::{RgbaImage, GenericImage};
 
 use common::CANVAS_SETTING;
 use common::CompressedImageInfo;
+use common::add_image_to_canvas;
 
 pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
     //unserialize the metadata file
@@ -21,7 +22,7 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
     CANVAS_SETTING.brotli_buffer_size);
 
     //initialize the canvas
-    let canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
+    let mut canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
 
     //for each image
     let mut count = 0;
@@ -46,6 +47,10 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
 
 
         //add the diff to the canvas at the specified coordinates
+        add_image_to_canvas(&mut canvas, &diff_image, metadata.x, metadata.y);
+        //debug: save entire canvas to preview reconstruction
+        canvas.save(format!("{}.canvas.png", count)).unwrap();
+
         //get the correct crop of the canvas (using metadata) as a new image
         //save the reconstructed image as .png file
         count += 1;

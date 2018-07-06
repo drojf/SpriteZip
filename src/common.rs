@@ -1,3 +1,5 @@
+use image;
+
 pub struct Rectangle  {
     pub width: u32,
     pub height: u32,
@@ -27,4 +29,54 @@ pub struct CompressedImageInfo {
     pub output_width: u32,
     //the width and height of the reconstructed image
     pub output_height: u32,
+}
+
+
+// TODO: crop diff'd images  so that not so much data needs to be compressed?
+/// Subtracts the canvas image from the given image, where the given image is assumed to be smaller
+/// than the canvas
+/// Eg: Performs [image - canvas] for all pixels in image.
+/// x_offset, y_offset: offsets image before performing the subtraction
+pub fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, x_offset : u32, y_offset : u32)
+{
+    for (x, y, pixel) in img.enumerate_pixels()
+    {
+        let mut canvas_pixel = canvas.get_pixel_mut(x + x_offset, y + y_offset);
+
+        //TODO: disable debug mode to use alpha value
+        //must specify u8 to ensure wrapping occurs
+        let new_pixel : [u8; 4] = [
+            pixel[0].wrapping_sub(canvas_pixel[0]),
+            pixel[1].wrapping_sub(canvas_pixel[1]),
+            pixel[2].wrapping_sub(canvas_pixel[2]),
+            pixel[3].wrapping_sub(canvas_pixel[3]),
+        ];
+
+        *canvas_pixel = image::Rgba(new_pixel);
+    }
+}
+
+
+// TODO: crop diff'd images  so that not so much data needs to be compressed?
+/// Subtracts the canvas image from the given image, where the given image is assumed to be smaller
+/// than the canvas
+/// Eg: Performs [image - canvas] for all pixels in image.
+/// x_offset, y_offset: offsets image before performing the subtraction
+pub fn add_image_to_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, x_offset : u32, y_offset : u32)
+{
+    for (x, y, pixel) in img.enumerate_pixels()
+    {
+        let mut canvas_pixel = canvas.get_pixel_mut(x + x_offset, y + y_offset);
+
+        //TODO: disable debug mode to use alpha value
+        //must specify u8 to ensure wrapping occurs
+        let new_pixel : [u8; 4] = [
+            pixel[0].wrapping_add(canvas_pixel[0]),
+            pixel[1].wrapping_add(canvas_pixel[1]),
+            pixel[2].wrapping_add(canvas_pixel[2]),
+            pixel[3].wrapping_add(canvas_pixel[3]),
+        ];
+
+        *canvas_pixel = image::Rgba(new_pixel);
+    }
 }
