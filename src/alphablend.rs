@@ -1,15 +1,10 @@
-extern crate image;
-extern crate walkdir;
-
 //standard uses
 use std::path::{Path};
-use std::io::{Write};
-use std::io;
 use std::fs;
-use std::fs::File;
 
-use image::{RgbImage, RgbaImage, GenericImage};
-
+//nonstandard includes
+use image;
+use image::{RgbImage, GenericImage};
 use walkdir::WalkDir;
 
 fn convert_to_onscripter_alphablend(filepath : &str, save_path : &str)
