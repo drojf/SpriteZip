@@ -13,6 +13,7 @@ use image::{RgbaImage, GenericImage};
 use walkdir::WalkDir;
 
 use common::CompressedImageInfo;
+use common::CANVAS_SETTING;
 
 struct CroppedImageBounds {
     x : u32,
@@ -102,9 +103,6 @@ pub fn compress_path(brotli_archive_path : &str, metadata_path : &str)
 
     let mut images_meta_info = Vec::new();
 
-    let canvas_width = 3000;
-    let canvas_height = 3000;
-
     let crop_enabled = true;
     let debug_mode = true;
     if debug_mode {
@@ -123,7 +121,7 @@ will be forced to 255 for .png output
     9,//11, //9 seems to be a good tradeoff...changing q doesn't seem to make much diff though?
     22);
 
-    let mut canvas = RgbaImage::new(canvas_width, canvas_height);
+    let mut canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
 
     println!("Begin scanning for images");
 
@@ -226,7 +224,7 @@ will be forced to 255 for .png output
         save_brotli_image(&mut compressor, &cropped_image_as_raw);
 
         //clear canvas (there must be a better way to do this?
-        canvas = RgbaImage::new(canvas_width, canvas_height);
+        canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
 
         //copy the original image onto canvas for next iteration
         canvas.copy_from(img, x_offset, y_offset);

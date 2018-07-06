@@ -1,3 +1,13 @@
+pub struct Rectangle  {
+    pub width: u32,
+    pub height: u32,
+}
+
+pub static CANVAS_SETTING : Rectangle = Rectangle {
+    width : 3000,
+    height: 3000,
+};
+
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct CompressedImageInfo {
     pub start_index: usize,
