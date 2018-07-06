@@ -52,8 +52,8 @@ fn main()
     if do_brotli_compression
     {
         let output_basename = "compressed_images";
-        let brotli_archive_path = [output_basename, ".brotli"].concat();
-        let metadata_path = [output_basename, ".brotli"].concat();
+        let brotli_archive_path = format!("{}.brotli", output_basename);
+        let metadata_path = format!("{}.metadata", output_basename);
 
         compress_path(&brotli_archive_path, &metadata_path);
 
