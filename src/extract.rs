@@ -16,11 +16,9 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
 
     //open the brotli file for reading
     let brotli_file = fs::File::open(brotli_archive_path).unwrap();
-    let mut extractor = brotli::CompressorReader::new(
+    let mut extractor = brotli::Decompressor::new(
     brotli_file,
-    CANVAS_SETTING.brotli_buffer_size,
-    CANVAS_SETTING.brotli_quality,
-    CANVAS_SETTING.brotli_window);
+    CANVAS_SETTING.brotli_buffer_size);
 
     //initialize the canvas
     let canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
@@ -39,7 +37,7 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
         //partially decompress the brotli file
         let mut raw_image_data = vec![0; expected_size];
         //TODO: add erorr check here? see https://doc.rust-lang.org/std/io/trait.Read.html
-        extractor.read(&mut raw_image_data).unwrap();
+        extractor.read_exact(&mut raw_image_data).unwrap();
 
         //debug: interpret the raw data as an image and save to file
         let diff_image = RgbaImage::from_raw(metadata.diff_width, metadata.diff_height, raw_image_data).unwrap();
