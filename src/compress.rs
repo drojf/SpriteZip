@@ -117,9 +117,9 @@ will be forced to 255 for .png output
 
     let mut compressor = brotli::CompressorWriter::new(
     f,
-    4096,
-    9,//11, //9 seems to be a good tradeoff...changing q doesn't seem to make much diff though?
-    22);
+    CANVAS_SETTING.brotli_buffer_size,
+    CANVAS_SETTING.brotli_quality,
+    CANVAS_SETTING.brotli_window);
 
     let mut canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
 

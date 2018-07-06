@@ -5,7 +5,7 @@ authors = ["Daniel Wong <drojfjord@gmail.com>"]
 
 [dependencies]
 image = "*"
-brotli = "2.2.1"
+brotli = "2.5.0"
 time = "*"
 walkdir = "*"
 serde = "1.0"
