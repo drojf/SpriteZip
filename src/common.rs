@@ -80,3 +80,17 @@ pub fn add_image_to_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImag
         *canvas_pixel = image::Rgba(new_pixel);
     }
 }
+
+pub fn offset_to_bottom_center_image_value(canvas_size : (u32, u32), img_size : (u32, u32)) -> (u32, u32)
+{
+    //Calculate image offset such that image is placed at the center bottom of the canvas.
+    let x_offset = (canvas_size.0 - img_size.0) / 2;
+    let y_offset = canvas_size.1 - img_size.1;
+    (x_offset, y_offset)
+}
+
+pub fn offset_to_bottom_center_image(canvas: &image::RgbaImage, img : &image::RgbaImage) -> (u32, u32)
+{
+    offset_to_bottom_center_image_value((canvas.width(), canvas.height()), (img.width(), img.height()))
+}
+

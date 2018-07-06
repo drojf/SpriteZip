@@ -4,11 +4,12 @@ use std::io::Read; //needed to use brotli read trait
 
 use brotli;
 use serde_json;
-use image::{RgbaImage, GenericImage};
+use image::{imageops, RgbaImage, GenericImage};
 
 use common::CANVAS_SETTING;
 use common::CompressedImageInfo;
 use common::add_image_to_canvas;
+use common::offset_to_bottom_center_image_value;
 
 pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
     //unserialize the metadata file
@@ -50,6 +51,22 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
         add_image_to_canvas(&mut canvas, &diff_image, metadata.x, metadata.y);
         //debug: save entire canvas to preview reconstruction
         canvas.save(format!("{}.canvas.png", count)).unwrap();
+
+
+        //calculate
+        let (crop_image_x, crop_image_y) = offset_to_bottom_center_image_value((canvas.width(), canvas.height()), (metadata.output_width, metadata.output_height));
+
+        let reconstructed_image = imageops::crop(&mut canvas,
+                  crop_image_x, crop_image_y,
+                  metadata.output_width, metadata.output_height).to_image();
+
+        reconstructed_image.save(format!("{}.recons.png", count)).unwrap();
+
+        //clear the canvas
+        canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
+
+        //copy the reconstructed image onto the canvas?
+        canvas.copy_from(&reconstructed_image, crop_image_x, crop_image_y);
 
         //get the correct crop of the canvas (using metadata) as a new image
         //save the reconstructed image as .png file

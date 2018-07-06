@@ -15,6 +15,8 @@ use walkdir::WalkDir;
 use common::CompressedImageInfo;
 use common::CANVAS_SETTING;
 use common::subtract_image_from_canvas;
+use common::offset_to_bottom_center_image;
+
 
 struct CroppedImageBounds {
     x : u32,
@@ -131,8 +133,7 @@ will be forced to 255 for .png output
         //TODO: check if input image is larger than the canvas
 
         //Calculate image offset such that image is placed at the center bottom of the canvas.
-        let x_offset = (canvas.width() - img.width()) / 2;
-        let y_offset = canvas.height() - img.height();
+        let (x_offset, y_offset) = offset_to_bottom_center_image(&canvas, &img);
 
         println!("Subtracting images");
         subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset);
