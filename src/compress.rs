@@ -4,7 +4,7 @@ use std::io::{Write};
 use std::fs;
 use std::fs::File;
 use time;
-use std::path::{Path};
+use std::path::Path;
 
 //non-standard use
 use serde_json;
@@ -67,13 +67,13 @@ fn crop_function(img: &image::RgbaImage, x_offset : u32, y_offset : u32, max_wid
 /// Saves a raw canvas image using an external compressor
 /// compressor: the compressor to use to save the image
 /// canvas_as_raw: the raw image to be saved using the compressor
-fn save_brotli_image<T>(compressor : &mut brotli::CompressorWriter<T>, canvas_as_raw : &Vec<u8>)
+fn save_brotli_image<T>(compressor : &mut brotli::CompressorWriter<T>, canvas_as_raw : &Vec<u8>, print_execution_time : bool)
 where T: std::io::Write
 {
     let brotli_start = time::PreciseTime::now();
     compressor.write(canvas_as_raw).unwrap();
     let brotli_end = time::PreciseTime::now();
-    println!("Brotli compression took {} seconds", brotli_start.to(brotli_end));
+    if print_execution_time { println!("Brotli compression took {} seconds", brotli_start.to(brotli_end)); }
 }
 
 
@@ -133,7 +133,7 @@ will be forced to 255 for .png output
         //Calculate image offset such that image is placed at the center bottom of the canvas.
         let (x_offset, y_offset) = offset_to_bottom_center_image(&canvas, &img);
 
-        println!("Subtracting images");
+        if debug_mode { println!("Subtracting images"); }
         subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset);
 
         //TODO: crop diff
@@ -173,9 +173,9 @@ will be forced to 255 for .png output
         println!("Image size is {},  width is {} height is {}", cropped_image_size, cropped_image_bounds.width, cropped_image_bounds.height);
 
         //save diff image as png for debugging reasons
-        println!("Saving .png");
         if debug_mode
         {
+            println!("Saving .png");
             let mut cropped_image_copy = cropped_image.clone();
             for pixel in cropped_image_copy.pixels_mut()
             {
@@ -196,9 +196,7 @@ will be forced to 255 for .png output
         // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
         // However subsequent RgbaImage::new assigns a new value to the canvas each iteration
         let cropped_image_as_raw = cropped_image.into_raw();
-
-        println!("Saving .brotli");
-        save_brotli_image(&mut compressor, &cropped_image_as_raw);
+        save_brotli_image(&mut compressor, &cropped_image_as_raw, true);
 
         //clear canvas (there must be a better way to do this?
         canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);

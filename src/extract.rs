@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path};
+use std::path::Path;
 use std::io::Read; //needed to use brotli read trait
 
 use brotli;
