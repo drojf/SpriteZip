@@ -1,4 +1,6 @@
 use image;
+use walkdir::WalkDir;
+use std::path::Path;
 
 pub struct Rectangle  {
     pub width: u32,
@@ -96,3 +98,44 @@ pub fn offset_to_bottom_center_image(canvas: &image::RgbaImage, img : &image::Rg
     offset_to_bottom_center_image_value((canvas.width(), canvas.height()), (img.width(), img.height()))
 }
 
+pub fn verify_images(input_folder : &str, output_folder : &str) -> bool
+{
+    //iterate over each image in input folder
+    for entry in WalkDir::new(input_folder)
+    {
+        let ent = entry.unwrap();
+        if ent.file_type().is_dir() {
+            continue;
+        }
+
+        //load input and output images
+        let input_image_raw = image::open(ent.path()).unwrap().raw_pixels();
+
+        let path_relative_to_input_folder = ent.path().strip_prefix(input_folder).unwrap();
+        let output_folder_image_path = Path::new(output_folder).join(path_relative_to_input_folder);
+
+        match image::open(&output_folder_image_path) {
+            Ok(output_image) =>  {
+                let output_image_raw = output_image.raw_pixels();
+
+                println!("Comparing '{}' against '{}'...", ent.path().to_str().unwrap(), output_folder_image_path.to_str().unwrap());
+
+                //compare the raw buffer representation of each and verify each byte matches
+                for (input_b, output_b) in input_image_raw.iter().zip(output_image_raw.iter())
+                {
+                    if input_b != output_b {
+                        println!("Error: image {} does not match!", ent.path().to_str().unwrap());
+                        return false;
+                    }
+                }
+            }
+
+            Err(e) => {
+                println!("Error: corresponding output image can't be opened or doesn't exist! {:?}", e);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}

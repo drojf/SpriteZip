@@ -28,6 +28,7 @@ extern crate time;
 use alphablend::convert_folder_to_alphablend;
 use compress::compress_path;
 use extract::extract_archive;
+use common::verify_images;
 
 //standard uses
 use std::path::{Path};
@@ -46,8 +47,10 @@ fn main()
     let input_path = Path::new("input_images");
     std::fs::create_dir_all(input_path).unwrap();
 
-    let do_brotli_compression = false;
+    let do_brotli_compression = true;
     let do_brotli_extract = true;
+    let do_brotli_verify = true;
+
     let do_onscripter_alphablend = false;
 
     let output_basename = "compressed_images";
@@ -56,13 +59,25 @@ fn main()
 
     if do_brotli_compression
     {
+        println!("\n\n ---------- Begin Compression... ---------- ");
         compress_path(&brotli_archive_path, &metadata_path, false);
     }
-    else if do_brotli_extract
+
+    if do_brotli_extract
     {
+        println!("\n\n ---------- Begin Extraction... ---------- ");
         extract_archive(&brotli_archive_path, &metadata_path, false);
     }
-    else if do_onscripter_alphablend
+
+    if do_brotli_verify
+    {
+        println!("\n\n ---------- Begin Verification... ---------- ");
+        println!("Verification Result: {}",
+            if verify_images("input_images", "output_images") {"SUCCESS"} else {"FAILURE"}
+        );
+    }
+
+    if do_onscripter_alphablend
     {
         let num_converted = convert_folder_to_alphablend();
 
