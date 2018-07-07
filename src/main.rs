@@ -31,7 +31,6 @@ use alphablend::convert_folder_to_alphablend;
 use compress::compress_path;
 use extract::extract_archive;
 use common::verify_images;
-use common::scan_folder_for_max_png_size;
 
 //standard uses
 use std::path::{Path};
@@ -46,8 +45,6 @@ fn pause()
 
 fn main()
 {
-    let (max_width, max_height) = scan_folder_for_max_png_size("input_images");
-
     //create input images folder if it doesn't already exist:
     let input_path = Path::new("input_images");
     std::fs::create_dir_all(input_path).unwrap();

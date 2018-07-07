@@ -7,14 +7,19 @@ use serde_json;
 use image::{imageops, RgbaImage, GenericImage};
 
 use common::CANVAS_SETTING;
-use common::CompressedImageInfo;
+use common::{CompressedImageInfo, DecompressionInfo};
 use common::add_image_to_canvas;
 use common::offset_to_bottom_center_image_value;
 
 pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str, debug_mode : bool) {
     //unserialize the metadata file
     let metadata_file = fs::File::open(metadata_path).unwrap();
-    let metadata_list: Vec<CompressedImageInfo> = serde_json::from_reader(metadata_file).unwrap();
+
+    let decompression_info : DecompressionInfo = serde_json::from_reader(metadata_file).unwrap();
+    let canvas_width = decompression_info.canvas_size.0;
+    let canvas_height = decompression_info.canvas_size.1;
+
+    let metadata_list = &decompression_info.images_info;
 
     //open the brotli file for reading
     let brotli_file = fs::File::open(brotli_archive_path).unwrap();
@@ -23,7 +28,7 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str, debug_m
     CANVAS_SETTING.brotli_buffer_size);
 
     //initialize the canvas
-    let mut canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
+    let mut canvas = RgbaImage::new(canvas_width, canvas_height);
 
     //for each image
     let mut count = 0;
@@ -59,12 +64,12 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str, debug_m
                   metadata.output_width, metadata.output_height).to_image();
 
         //create the folder(s) to put the image in, then save the image
-        let output_image_path = Path::new("output_images").join(metadata.output_path);
+        let output_image_path = Path::new("output_images").join(&metadata.output_path);
         fs::create_dir_all(output_image_path.parent().unwrap()).unwrap();
         reconstructed_image.save(output_image_path).unwrap();
 
         //clear the canvas
-        canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
+        canvas = RgbaImage::new(canvas_width, canvas_height);
 
         //copy the reconstructed image onto the canvas?
         canvas.copy_from(&reconstructed_image, crop_image_x, crop_image_y);

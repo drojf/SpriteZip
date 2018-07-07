@@ -7,20 +7,22 @@ use std::io::BufReader;
 use std::io::Read;
 
 pub struct Rectangle  {
-    pub width: u32,
-    pub height: u32,
     pub brotli_buffer_size: usize,
     pub brotli_quality: u32,
     pub brotli_window: u32,
 }
 
 pub static CANVAS_SETTING : Rectangle = Rectangle {
-    width : 3000,
-    height: 3000,
     brotli_buffer_size: 4096,
     brotli_quality: 9, //11, //9 seems to be a good tradeoff...changing q doesn't seem to make much diff though?
     brotli_window: 22
 };
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DecompressionInfo {
+    pub canvas_size: (u32, u32),
+    pub images_info:  Vec<CompressedImageInfo>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CompressedImageInfo {

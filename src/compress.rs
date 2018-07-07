@@ -13,10 +13,11 @@ use image;
 use image::{RgbaImage, GenericImage};
 use walkdir::WalkDir;
 
-use common::CompressedImageInfo;
+use common::{CompressedImageInfo, DecompressionInfo};
 use common::CANVAS_SETTING;
 use common::subtract_image_from_canvas;
 use common::offset_to_bottom_center_image;
+use common::scan_folder_for_max_png_size;
 
 
 struct CroppedImageBounds {
@@ -81,6 +82,13 @@ where T: std::io::Write
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
 pub fn compress_path(brotli_archive_path : &str, metadata_path : &str, debug_mode : bool)
 {
+    let (max_width, max_height) = scan_folder_for_max_png_size("input_images");
+
+    println!("max width: {} max_height: {}", max_width, max_height);
+
+    let canvas_width =  (max_width + 1)  & !0x1;
+    let canvas_height = (max_height + 1) & !0x1;
+
     let mut current_start_index : usize = 0;
 
     let mut images_meta_info = Vec::new();
@@ -102,7 +110,7 @@ will be forced to 255 for .png output
     CANVAS_SETTING.brotli_quality,
     CANVAS_SETTING.brotli_window);
 
-    let mut canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
+    let mut canvas = RgbaImage::new(canvas_width, canvas_height);
 
     println!("Begin scanning for images");
 
@@ -199,7 +207,7 @@ will be forced to 255 for .png output
         save_brotli_image(&mut compressor, &cropped_image_as_raw, true);
 
         //clear canvas (there must be a better way to do this?
-        canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);
+        canvas = RgbaImage::new(canvas_width, canvas_height);
 
         //copy the original image onto canvas for next iteration
         canvas.copy_from(img, x_offset, y_offset);
@@ -208,8 +216,13 @@ will be forced to 255 for .png output
         count += 1;
     }
 
+    let decompression_info = DecompressionInfo {
+        canvas_size : (canvas_width, canvas_height),
+        images_info : images_meta_info,
+    };
+
     //saving meta info
-    let serialized = serde_json::to_string(&images_meta_info).unwrap();
+    let serialized = serde_json::to_string(&decompression_info).unwrap();
     println!("serialized = {}", serialized);
     fs::write(metadata_path, serialized).expect("Unable to write metadata file");
 }
