@@ -16,7 +16,7 @@ pub static CANVAS_SETTING : Rectangle = Rectangle {
     brotli_window: 22
 };
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CompressedImageInfo {
     pub start_index: usize,
     //where in the compressed data stream the image starts
@@ -29,6 +29,8 @@ pub struct CompressedImageInfo {
     pub output_width: u32,
     //the width and height of the reconstructed image
     pub output_height: u32,
+    //the output path of the image
+    pub output_path: String,
 }
 
 

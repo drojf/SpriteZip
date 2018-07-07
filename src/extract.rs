@@ -1,5 +1,5 @@
 use std::fs;
-
+use std::path::{Path};
 use std::io::Read; //needed to use brotli read trait
 
 use brotli;
@@ -60,7 +60,10 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
                   crop_image_x, crop_image_y,
                   metadata.output_width, metadata.output_height).to_image();
 
-        reconstructed_image.save(format!("{}.recons.png", count)).unwrap();
+        //create the folder(s) to put the image in, then save the image
+        let output_image_path = Path::new("output_images").join(metadata.output_path);
+        fs::create_dir_all(output_image_path.parent().unwrap()).unwrap();
+        reconstructed_image.save(output_image_path).unwrap();
 
         //clear the canvas
         canvas = RgbaImage::new(CANVAS_SETTING.width, CANVAS_SETTING.height);

@@ -4,6 +4,7 @@ use std::io::{Write};
 use std::fs;
 use std::fs::File;
 use time;
+use std::path::{Path};
 
 //non-standard use
 use serde_json;
@@ -120,6 +121,7 @@ will be forced to 255 for .png output
         }
 
         println!("\nProcessing Image {}: '{}'", count, ent.path().display());
+        let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
 
         let file_name_no_ext = ent.path().file_stem().unwrap().to_str().unwrap();
         let save_path = [file_name_no_ext, ".png"].concat();
@@ -167,6 +169,7 @@ will be forced to 255 for .png output
             diff_height: cropped_image_bounds.height,  // NEEDS UPDATE
             output_width: img.width(),   //the width and height of the reconstructed image
             output_height: img.height(),
+            output_path: String::from(path_relative_to_input_folder),
         });
 
         current_start_index += cropped_image_size;
