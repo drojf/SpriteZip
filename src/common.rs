@@ -1,6 +1,10 @@
 use image;
 use walkdir::WalkDir;
+use std;
 use std::path::Path;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::Read;
 
 pub struct Rectangle  {
     pub width: u32,
@@ -138,4 +142,72 @@ pub fn verify_images(input_folder : &str, output_folder : &str) -> bool
     }
 
     return true;
+}
+
+//convert 4 bytes from a 4 byte array into a u32 value, big endian
+pub fn u8_buf_to_u32_big_endian(buf : &[u8; 4]) -> u32
+{
+    (buf[0] as u32) << 24 |
+    (buf[1] as u32) << 16 |
+    (buf[2] as u32) << 8  |
+    (buf[3] as u32)
+}
+
+//convert 4 bytes from a stream into a u32 value, big endian
+pub fn u8_stream_to_u32_big_endian(reader : &mut Read) -> u32
+{
+    let mut png_width_bytes  = [0u8; 4];
+    reader.read_exact(&mut png_width_bytes);
+    return u8_buf_to_u32_big_endian(&png_width_bytes);
+}
+
+/// Read the width and height of a .png file
+pub fn get_png_dimensions(reader : &mut Read) -> Result<(u32, u32), &'static str>
+{
+    let reference_png_header : [u8; 16] = [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, //PNG header (always the same)
+         0,   0,    0,    13, //this is the first chunk's length variable
+        73,   72,   68,   82, //'IHDR' header
+    ];
+
+    let mut actual_png_header = [0u8; 16];
+    reader.read_exact(&mut actual_png_header); //read the first 16 bytes
+
+    if reference_png_header != actual_png_header {
+        return Err("Incorrect PNG header");
+    }
+
+    //the chunk data of the IHDR chunk
+    //stored as big endian
+    let width = u8_stream_to_u32_big_endian(reader);  //read the next 4 bytes (the width)
+    let height = u8_stream_to_u32_big_endian(reader); //read the next 4 bytes (the height)
+
+    Ok((width, height))
+}
+
+//TODO: handle the case where images width/height is all 0?
+pub fn scan_folder_for_max_png_size(input_folder : &str) -> (u32, u32)
+{
+    let mut max_width = 0;
+    let mut max_height = 0;
+    //iterate over each image in input folder
+    for entry in WalkDir::new(input_folder)
+    {
+        let ent = entry.unwrap();
+        if ent.file_type().is_dir() {
+            continue;
+        }
+
+        let file_path = ent.path().to_str().unwrap();
+        let png_file = File::open(file_path).unwrap();
+        let mut reader = BufReader::new(png_file);
+        let (width, height) = get_png_dimensions(&mut reader).expect("Could not read png file dimensions!");
+
+        max_width = std::cmp::max(max_width, width);
+        max_height = std::cmp::max(max_height, height);
+
+        println!("Image {} width {} height {}", file_path, width, height);
+    }
+
+    (max_width, max_height)
 }
