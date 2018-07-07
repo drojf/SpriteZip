@@ -19,6 +19,12 @@ pub static CANVAS_SETTING : Rectangle = Rectangle {
 };
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct CompressedFileInfo {
+    pub brotli_start : u64,
+    pub decompression_info_start : u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DecompressionInfo {
     pub canvas_size: (u32, u32),
     pub images_info:  Vec<CompressedImageInfo>,

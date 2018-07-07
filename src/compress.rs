@@ -5,6 +5,8 @@ use std::fs;
 use std::fs::File;
 use time;
 use std::path::Path;
+use std::io::SeekFrom;
+use std::io::Seek;
 
 //non-standard use
 use serde_json;
@@ -13,7 +15,7 @@ use image;
 use image::{RgbaImage, GenericImage};
 use walkdir::WalkDir;
 
-use common::{CompressedImageInfo, DecompressionInfo};
+use common::{CompressedFileInfo, CompressedImageInfo, DecompressionInfo};
 use common::CANVAS_SETTING;
 use common::subtract_image_from_canvas;
 use common::offset_to_bottom_center_image;
@@ -78,7 +80,10 @@ where T: std::io::Write
 }
 
 
-
+/// File format is as follows:
+/// [1000 bytes] - variable JSON string containing a CompressedFileInfo struct
+/// [Variable Length] -  brotli compressed image data. Start location encoded in the CompressedFileInfo struct
+/// [Variable Length] - JSON encoded metadata for each image. Start location encoded in the CompressedFileInfo struct
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
 pub fn compress_path(brotli_archive_path : &str, metadata_path : &str, debug_mode : bool)
 {
@@ -86,7 +91,7 @@ pub fn compress_path(brotli_archive_path : &str, metadata_path : &str, debug_mod
 
     println!("max width: {} max_height: {}", max_width, max_height);
 
-    let canvas_width =  (max_width + 1)  & !0x1;
+    let canvas_width  = (max_width + 1)  & !0x1;
     let canvas_height = (max_height + 1) & !0x1;
 
     let mut current_start_index : usize = 0;
@@ -102,119 +107,127 @@ will be forced to 255 for .png output
     ");
     }
 
-    let f = File::create(brotli_archive_path).expect("Cannot create file");
+    let mut f = File::create(brotli_archive_path).expect("Cannot create file");
 
-    let mut compressor = brotli::CompressorWriter::new(
-    f,
-    CANVAS_SETTING.brotli_buffer_size,
-    CANVAS_SETTING.brotli_quality,
-    CANVAS_SETTING.brotli_window);
+    //allocate some space to record how long the brotli compressed data is
+    f.write(&['\n' as u8; 1000]);
+    let brotli_start_position = f.seek(SeekFrom::Current(0)).unwrap();
 
-    let mut canvas = RgbaImage::new(canvas_width, canvas_height);
-
-    println!("Begin scanning for images");
-
-    //TODO: check that input_images directory exists before scanning it.
-    //TODO: check each image's color type as subtracting a RGB image from an RGBA image shouldn't work.
-    // see: println!("{:?}", img.color());
-
-    let test_iter = WalkDir::new("input_images");
-    let mut count = 0;
-    for entry in test_iter
     {
-        let ent = entry.unwrap();
-        if ent.file_type().is_dir() {
-            continue;
-        }
+        let mut compressor = brotli::CompressorWriter::new(
+        &f,
+        CANVAS_SETTING.brotli_buffer_size,
+        CANVAS_SETTING.brotli_quality,
+        CANVAS_SETTING.brotli_window);
 
-        let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
+        let mut canvas = RgbaImage::new(canvas_width, canvas_height);
 
-        println!("\nProcessing Image {}: '{}'", count, ent.path().display());
+        println!("Begin scanning for images");
 
-        let img_dyn = image::open(ent.path()).unwrap();
-        let img = img_dyn.as_rgba8().unwrap();
+        //TODO: check that input_images directory exists before scanning it.
+        //TODO: check each image's color type as subtracting a RGB image from an RGBA image shouldn't work.
+        // see: println!("{:?}", img.color());
 
-        println!("Original Image width is {} height is {}", img.width(), img.height());
-
-        //TODO: check if input image is larger than the canvas
-
-        //Calculate image offset such that image is placed at the center bottom of the canvas.
-        let (x_offset, y_offset) = offset_to_bottom_center_image(&canvas, &img);
-
-        if debug_mode { println!("Subtracting images"); }
-        subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset);
-
-        //TODO: crop diff
-        let cropped_image_bounds = crop_function(&canvas,
-                                                     x_offset, y_offset,
-                                                     img.width(), img.height());
-
-        //Note: a copy occurs here, for simplicity, so that the cropped image can be saved/compressed
-        // As the cropped diff is usually small, this shouldn't have much impact on performance
-        let cropped_image = if crop_enabled
+        let test_iter = WalkDir::new("input_images");
+        let mut count = 0;
+        for entry in test_iter
         {
-            image::imageops::crop(&mut canvas,
-                              cropped_image_bounds.x, cropped_image_bounds.y,
-                              cropped_image_bounds.width, cropped_image_bounds.height).to_image()
-        }
-        else
-        {
-            canvas.clone()
-        };
-
-        //save meta info
-        let cropped_image_size = cropped_image.len();
-
-        images_meta_info.push(CompressedImageInfo{
-            start_index: current_start_index,   //where in the compressed data stream the image starts
-            x: cropped_image_bounds.x,             //where on the canvas the diff should be placed (NEEDS UPDATE
-            y: cropped_image_bounds.y,            //(NEEDS UPDATE
-            diff_width: cropped_image_bounds.width,     //NEEDS UPDATE the width and height of the diff image
-            diff_height: cropped_image_bounds.height,  // NEEDS UPDATE
-            output_width: img.width(),   //the width and height of the reconstructed image
-            output_height: img.height(),
-            output_path: String::from(path_relative_to_input_folder),
-        });
-
-        current_start_index += cropped_image_size;
-
-        println!("Image size is {},  width is {} height is {}", cropped_image_size, cropped_image_bounds.width, cropped_image_bounds.height);
-
-        //save diff image as png for debugging reasons
-        if debug_mode
-        {
-            println!("Saving .png");
-            let mut cropped_image_copy = cropped_image.clone();
-            for pixel in cropped_image_copy.pixels_mut()
-            {
-                *pixel = image::Rgba([
-                    pixel[0],
-                    pixel[1],
-                    pixel[2],
-                    255
-                ]);
+            let ent = entry.unwrap();
+            if ent.file_type().is_dir() {
+                continue;
             }
 
-            let save_path = Path::new("debug_images").join(path_relative_to_input_folder);
-            println!("Will save image to: {}", save_path.to_str().unwrap());
-            cropped_image_copy.save(save_path).unwrap()
+            let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
+
+            println!("\nProcessing Image {}: '{}'", count, ent.path().display());
+
+            let img_dyn = image::open(ent.path()).unwrap();
+            let img = img_dyn.as_rgba8().unwrap();
+
+            println!("Original Image width is {} height is {}", img.width(), img.height());
+
+            //TODO: check if input image is larger than the canvas
+
+            //Calculate image offset such that image is placed at the center bottom of the canvas.
+            let (x_offset, y_offset) = offset_to_bottom_center_image(&canvas, &img);
+
+            if debug_mode { println!("Subtracting images"); }
+            subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset);
+
+            //TODO: crop diff
+            let cropped_image_bounds = crop_function(&canvas,
+                                                         x_offset, y_offset,
+                                                         img.width(), img.height());
+
+            //Note: a copy occurs here, for simplicity, so that the cropped image can be saved/compressed
+            // As the cropped diff is usually small, this shouldn't have much impact on performance
+            let cropped_image = if crop_enabled
+            {
+                image::imageops::crop(&mut canvas,
+                                  cropped_image_bounds.x, cropped_image_bounds.y,
+                                  cropped_image_bounds.width, cropped_image_bounds.height).to_image()
+            }
+            else
+            {
+                canvas.clone()
+            };
+
+            //save meta info
+            let cropped_image_size = cropped_image.len();
+
+            images_meta_info.push(CompressedImageInfo{
+                start_index: current_start_index,   //where in the compressed data stream the image starts
+                x: cropped_image_bounds.x,             //where on the canvas the diff should be placed (NEEDS UPDATE
+                y: cropped_image_bounds.y,            //(NEEDS UPDATE
+                diff_width: cropped_image_bounds.width,     //NEEDS UPDATE the width and height of the diff image
+                diff_height: cropped_image_bounds.height,  // NEEDS UPDATE
+                output_width: img.width(),   //the width and height of the reconstructed image
+                output_height: img.height(),
+                output_path: String::from(path_relative_to_input_folder),
+            });
+
+            current_start_index += cropped_image_size;
+
+            println!("Image size is {},  width is {} height is {}", cropped_image_size, cropped_image_bounds.width, cropped_image_bounds.height);
+
+            //save diff image as png for debugging reasons
+            if debug_mode
+            {
+                println!("Saving .png");
+                let mut cropped_image_copy = cropped_image.clone();
+                for pixel in cropped_image_copy.pixels_mut()
+                {
+                    *pixel = image::Rgba([
+                        pixel[0],
+                        pixel[1],
+                        pixel[2],
+                        255
+                    ]);
+                }
+
+                let save_path = Path::new("debug_images").join(path_relative_to_input_folder);
+                println!("Will save image to: {}", save_path.to_str().unwrap());
+                cropped_image_copy.save(save_path).unwrap()
+            }
+
+            // Compress the the diff image (or 'normal' image for first image)
+            // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
+            // However subsequent RgbaImage::new assigns a new value to the canvas each iteration
+            let cropped_image_as_raw = cropped_image.into_raw();
+            save_brotli_image(&mut compressor, &cropped_image_as_raw, true);
+
+            //clear canvas (there must be a better way to do this?
+            canvas = RgbaImage::new(canvas_width, canvas_height);
+
+            //copy the original image onto canvas for next iteration
+            canvas.copy_from(img, x_offset, y_offset);
+
+
+            count += 1;
         }
-
-        // Compress the the diff image (or 'normal' image for first image)
-        // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
-        // However subsequent RgbaImage::new assigns a new value to the canvas each iteration
-        let cropped_image_as_raw = cropped_image.into_raw();
-        save_brotli_image(&mut compressor, &cropped_image_as_raw, true);
-
-        //clear canvas (there must be a better way to do this?
-        canvas = RgbaImage::new(canvas_width, canvas_height);
-
-        //copy the original image onto canvas for next iteration
-        canvas.copy_from(img, x_offset, y_offset);
-
-
-        count += 1;
     }
+
+    let decompression_info_start = f.seek(SeekFrom::Current(0)).unwrap();
 
     let decompression_info = DecompressionInfo {
         canvas_size : (canvas_width, canvas_height),
@@ -224,5 +237,18 @@ will be forced to 255 for .png output
     //saving meta info
     let serialized = serde_json::to_string(&decompression_info).unwrap();
     println!("serialized = {}", serialized);
-    fs::write(metadata_path, serialized).expect("Unable to write metadata file");
+    f.write(serialized.as_bytes()).expect("Unable to write metadata file");
+
+    //return to start of file to write header info
+    f.seek(SeekFrom::Start(0));
+
+    //saving meta info
+    let compressed_file_info = CompressedFileInfo {
+        brotli_start : brotli_start_position,
+        decompression_info_start : decompression_info_start,
+    };
+
+    let serialized = serde_json::to_string(&compressed_file_info).unwrap();
+    f.write(serialized.as_bytes()).expect("Unable to write metadata file");
+
 }

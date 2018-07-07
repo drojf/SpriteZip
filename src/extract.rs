@@ -1,28 +1,40 @@
 use std::fs;
 use std::path::Path;
 use std::io::Read; //needed to use brotli read trait
+use std::io::SeekFrom;
+use std::io::Seek;
+
 
 use brotli;
 use serde_json;
 use image::{imageops, RgbaImage, GenericImage};
 
 use common::CANVAS_SETTING;
-use common::{CompressedImageInfo, DecompressionInfo};
+use common::{CompressedFileInfo, CompressedImageInfo, DecompressionInfo};
 use common::add_image_to_canvas;
 use common::offset_to_bottom_center_image_value;
 
 pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str, debug_mode : bool) {
     //unserialize the metadata file
-    let metadata_file = fs::File::open(metadata_path).unwrap();
-
-    let decompression_info : DecompressionInfo = serde_json::from_reader(metadata_file).unwrap();
-    let canvas_width = decompression_info.canvas_size.0;
-    let canvas_height = decompression_info.canvas_size.1;
-
-    let metadata_list = &decompression_info.images_info;
+    //let metadata_file = fs::File::open(metadata_path).unwrap();
 
     //open the brotli file for reading
-    let brotli_file = fs::File::open(brotli_archive_path).unwrap();
+    let mut brotli_file = fs::File::open(brotli_archive_path).unwrap();
+    let mut header : [u8; 1000] = [0; 1000];
+    brotli_file.read(&mut header);
+    let compressed_file_info : CompressedFileInfo = serde_json::from_slice(&mut header).unwrap();
+
+    //Skip to the decompression information section, and deserialize
+    brotli_file.seek(SeekFrom::Start(compressed_file_info.decompression_info_start));
+
+    let decompression_info : DecompressionInfo = serde_json::from_reader(&brotli_file).unwrap();
+    let canvas_width = decompression_info.canvas_size.0;
+    let canvas_height = decompression_info.canvas_size.1;
+    let metadata_list = &decompression_info.images_info;
+
+    //Skip to the brotli compressed data section, then begin extraction
+    brotli_file.seek(SeekFrom::Start(compressed_file_info.brotli_start));
+
     let mut extractor = brotli::Decompressor::new(
     brotli_file,
     CANVAS_SETTING.brotli_buffer_size);
