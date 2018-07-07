@@ -79,14 +79,13 @@ where T: std::io::Write
 
 
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
-pub fn compress_path(brotli_archive_path : &str, metadata_path : &str)
+pub fn compress_path(brotli_archive_path : &str, metadata_path : &str, debug_mode : bool)
 {
     let mut current_start_index : usize = 0;
 
     let mut images_meta_info = Vec::new();
 
     let crop_enabled = true;
-    let debug_mode = true;
     if debug_mode {
         println!("-----------
 Warning: Debug mode is enabled - alpha channel
@@ -120,12 +119,9 @@ will be forced to 255 for .png output
             continue;
         }
 
-        println!("\nProcessing Image {}: '{}'", count, ent.path().display());
         let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
 
-        let file_name_no_ext = ent.path().file_stem().unwrap().to_str().unwrap();
-        let save_path = [file_name_no_ext, ".png"].concat();
-        println!("Will save image to: {}", save_path);
+        println!("\nProcessing Image {}: '{}'", count, ent.path().display());
 
         let img_dyn = image::open(ent.path()).unwrap();
         let img = img_dyn.as_rgba8().unwrap();
@@ -191,11 +187,9 @@ will be forced to 255 for .png output
                 ]);
             }
 
+            let save_path = Path::new("debug_images").join(path_relative_to_input_folder);
+            println!("Will save image to: {}", save_path.to_str().unwrap());
             cropped_image_copy.save(save_path).unwrap()
-        }
-        else
-        {
-            cropped_image.save(save_path).unwrap();
         }
 
         // Compress the the diff image (or 'normal' image for first image)

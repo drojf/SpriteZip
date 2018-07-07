@@ -11,7 +11,7 @@ use common::CompressedImageInfo;
 use common::add_image_to_canvas;
 use common::offset_to_bottom_center_image_value;
 
-pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
+pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str, debug_mode : bool) {
     //unserialize the metadata file
     let metadata_file = fs::File::open(metadata_path).unwrap();
     let metadata_list: Vec<CompressedImageInfo> = serde_json::from_reader(metadata_file).unwrap();
@@ -44,14 +44,12 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str) {
         //debug: interpret the raw data as an image and save to file
         let diff_image = RgbaImage::from_raw(metadata.diff_width, metadata.diff_height, raw_image_data).unwrap();
 
-        diff_image.save(format!("{}.png", count)).unwrap();
-
+        if debug_mode { diff_image.save(format!("{}.png", count)).unwrap(); }
 
         //add the diff to the canvas at the specified coordinates
         add_image_to_canvas(&mut canvas, &diff_image, metadata.x, metadata.y);
         //debug: save entire canvas to preview reconstruction
-        canvas.save(format!("{}.canvas.png", count)).unwrap();
-
+        if debug_mode { canvas.save(format!("{}.canvas.png", count)).unwrap(); }
 
         //calculate
         let (crop_image_x, crop_image_y) = offset_to_bottom_center_image_value((canvas.width(), canvas.height()), (metadata.output_width, metadata.output_height));

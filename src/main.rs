@@ -56,11 +56,11 @@ fn main()
 
     if do_brotli_compression
     {
-        compress_path(&brotli_archive_path, &metadata_path);
+        compress_path(&brotli_archive_path, &metadata_path, false);
     }
     else if do_brotli_extract
     {
-        extract_archive(&brotli_archive_path, &metadata_path);
+        extract_archive(&brotli_archive_path, &metadata_path, false);
     }
     else if do_onscripter_alphablend
     {
