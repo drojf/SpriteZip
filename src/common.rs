@@ -8,18 +8,7 @@ use std::io::BufReader;
 use std::io::Read;
 
 pub const FILE_FORMAT_HEADER_LENGTH: usize = 8;
-
-pub struct Rectangle  {
-    pub brotli_buffer_size: usize,
-    pub brotli_quality: u32,
-    pub brotli_window: u32,
-}
-
-pub static CANVAS_SETTING : Rectangle = Rectangle {
-    brotli_buffer_size: 4096,
-    brotli_quality: 9, //11, //9 seems to be a good tradeoff...changing q doesn't seem to make much diff though?
-    brotli_window: 22,
-};
+pub const BROTLI_BUFFER_SIZE: usize = 4096; //buffer size used for compression and decompression
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DecompressionInfo {

@@ -34,13 +34,6 @@ use common::verify_images;
 
 //standard uses
 use std::path::{Path};
-use std::io;
-
-fn pause()
-{
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-}
 
 fn main()
 {
@@ -84,13 +77,8 @@ fn main()
         if num_converted == 0
         {
             println!("Please place .png files/folders in the 'input_images' directory. They will be converted and placed in the 'output_images' directory.");
-            println!("Press any key to continue...");
-            pause();
             return;
         }
 
     }
-    
-    println!("All done. Press enter to continue...");
-    pause();
 }

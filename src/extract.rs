@@ -9,12 +9,11 @@ use brotli;
 use serde_json;
 use image::{imageops, RgbaImage, GenericImage};
 
-use common::CANVAS_SETTING;
 use common::{DecompressionInfo};
 use common::add_image_to_canvas;
 use common::offset_to_bottom_center_image_value;
 use common::u8_buf_to_u64_little_endian;
-use common::FILE_FORMAT_HEADER_LENGTH;
+use common::{FILE_FORMAT_HEADER_LENGTH, BROTLI_BUFFER_SIZE};
 
 pub fn extract_archive(brotli_archive_path : &str, debug_mode : bool) {
     //open the brotli file for reading
@@ -40,9 +39,7 @@ pub fn extract_archive(brotli_archive_path : &str, debug_mode : bool) {
          brotli_file.seek(SeekFrom::Start(FILE_FORMAT_HEADER_LENGTH as u64)).unwrap()
     );
 
-    let mut extractor = brotli::Decompressor::new(
-    brotli_file,
-    CANVAS_SETTING.brotli_buffer_size);
+    let mut extractor = brotli::Decompressor::new(brotli_file, BROTLI_BUFFER_SIZE);
 
     //initialize the canvas
     let mut canvas = RgbaImage::new(canvas_width, canvas_height);

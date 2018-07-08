@@ -14,13 +14,12 @@ use image::{RgbaImage, GenericImage};
 use walkdir::WalkDir;
 
 use common::{CompressedImageInfo, DecompressionInfo};
-use common::CANVAS_SETTING;
 use common::subtract_image_from_canvas;
 use common::offset_to_bottom_center_image;
 use common::scan_folder_for_max_png_size;
 use common::u64_to_u8_buf_little_endian;
-use common::FILE_FORMAT_HEADER_LENGTH;
 use common::save_image_no_alpha;
+use common::{FILE_FORMAT_HEADER_LENGTH, BROTLI_BUFFER_SIZE};
 
 struct CroppedImageBounds {
     x : u32,
@@ -65,8 +64,6 @@ fn crop_function(img: &image::RgbaImage, offset : (u32, u32), max_width : u32, m
     }
 }
 
-
-
 /// Saves a raw canvas image using an external compressor
 /// compressor: the compressor to use to save the image
 /// canvas_as_raw: the raw image to be saved using the compressor
@@ -86,26 +83,28 @@ where T: std::io::Write
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
 pub fn compress_path(brotli_archive_path : &str, debug_mode : bool)
 {
+    let brotli_quality = 9;
+    let brotli_window = 22;
+
     let (max_width, max_height) = scan_folder_for_max_png_size("input_images");
     let canvas_width  = (max_width + 1)  & !0x1;
     let canvas_height = (max_height + 1) & !0x1;
     println!("max image size: ({},{})\nchosen canvas size: ({},{})", max_width, max_height, canvas_width, canvas_height);
 
-    let mut current_start_index : usize = 0;
-
+    let mut image_start_index_in_brotli_stream : usize = 0;
     let mut images_meta_info = Vec::new();
-
     let mut f = File::create(brotli_archive_path).expect("Cannot create file");
 
     //allocate some space to record how long the brotli compressed data is
     f.write(&[0; FILE_FORMAT_HEADER_LENGTH]).expect("Unable to allocate header space in file");
 
+    //This set of braces forces the &f mutable reference used in the 'compressor' to go out of scope
     {
         let mut compressor = brotli::CompressorWriter::new(
         &f,
-        CANVAS_SETTING.brotli_buffer_size,
-        CANVAS_SETTING.brotli_quality,
-        CANVAS_SETTING.brotli_window);
+        BROTLI_BUFFER_SIZE,
+        brotli_quality,
+        brotli_window);
 
         let mut canvas = RgbaImage::new(canvas_width, canvas_height);
 
@@ -144,22 +143,19 @@ pub fn compress_path(brotli_archive_path : &str, debug_mode : bool)
                 cropped_image_bounds.width, cropped_image_bounds.height).to_image();
 
             //save meta info
-            let cropped_image_size = cropped_image.len();
-
             images_meta_info.push(CompressedImageInfo{
-                start_index: current_start_index,       //where in the compressed data stream the image starts
-                x: cropped_image_bounds.x,              //where on the canvas the diff should be placed (NEEDS UPDATE
+                start_index: image_start_index_in_brotli_stream,   //where in the compressed data stream the image starts
+                x: cropped_image_bounds.x,                         //where on the canvas the diff should be placed (NEEDS UPDATE
                 y: cropped_image_bounds.y,
-                diff_width: cropped_image_bounds.width,     //the width and height of the diff image
+                diff_width: cropped_image_bounds.width,            //the width and height of the diff image
                 diff_height: cropped_image_bounds.height,
-                output_width: img.width(),   //the width and height of the reconstructed image
+                output_width: img.width(),                         //the width and height of the reconstructed image
                 output_height: img.height(),
                 output_path: String::from(path_relative_to_input_folder),
             });
 
-            current_start_index += cropped_image_size;
-
-            println!("Image size is {},  width is {} height is {}", cropped_image_size, cropped_image_bounds.width, cropped_image_bounds.height);
+            image_start_index_in_brotli_stream += cropped_image.len();
+            println!("Image size is {},  width is {} height is {}", cropped_image.len(), cropped_image_bounds.width, cropped_image_bounds.height);
 
             //save diff image as png for debugging reasons
             if debug_mode { save_image_no_alpha(cropped_image.clone(), path_relative_to_input_folder); }
