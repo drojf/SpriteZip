@@ -10,22 +10,25 @@ use serde_json;
 use image::{imageops, RgbaImage, GenericImage};
 
 use common::CANVAS_SETTING;
-use common::{CompressedFileInfo, CompressedImageInfo, DecompressionInfo};
+use common::{CompressedImageInfo, DecompressionInfo};
 use common::add_image_to_canvas;
 use common::offset_to_bottom_center_image_value;
+use common::u8_buf_to_u64_little_endian;
+use common::FILE_FORMAT_HEADER_LENGTH;
 
 pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str, debug_mode : bool) {
-    //unserialize the metadata file
-    //let metadata_file = fs::File::open(metadata_path).unwrap();
-
     //open the brotli file for reading
     let mut brotli_file = fs::File::open(brotli_archive_path).unwrap();
-    let mut header : [u8; 1000] = [0; 1000];
+
+    //determine where the decompression info starts
+    let mut header : [u8; FILE_FORMAT_HEADER_LENGTH] = [0; FILE_FORMAT_HEADER_LENGTH];
     brotli_file.read(&mut header);
-    let compressed_file_info : CompressedFileInfo = serde_json::from_slice(&mut header).unwrap();
+    let decompression_info_start = u8_buf_to_u64_little_endian(&header);
 
     //Skip to the decompression information section, and deserialize
-    brotli_file.seek(SeekFrom::Start(compressed_file_info.decompression_info_start));
+    println!("Decompression information starts at {}",
+        brotli_file.seek(SeekFrom::Start(decompression_info_start)).unwrap()
+    );
 
     let decompression_info : DecompressionInfo = serde_json::from_reader(&brotli_file).unwrap();
     let canvas_width = decompression_info.canvas_size.0;
@@ -33,7 +36,9 @@ pub fn extract_archive(brotli_archive_path : &str, metadata_path : &str, debug_m
     let metadata_list = &decompression_info.images_info;
 
     //Skip to the brotli compressed data section, then begin extraction
-    brotli_file.seek(SeekFrom::Start(compressed_file_info.brotli_start));
+    println!("Brotli compressed data starts at {}",
+         brotli_file.seek(SeekFrom::Start(FILE_FORMAT_HEADER_LENGTH as u64)).unwrap()
+    );
 
     let mut extractor = brotli::Decompressor::new(
     brotli_file,

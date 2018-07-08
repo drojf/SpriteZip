@@ -6,6 +6,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
 
+pub const FILE_FORMAT_HEADER_LENGTH: usize = 8;
+
 pub struct Rectangle  {
     pub brotli_buffer_size: usize,
     pub brotli_quality: u32,
@@ -15,14 +17,8 @@ pub struct Rectangle  {
 pub static CANVAS_SETTING : Rectangle = Rectangle {
     brotli_buffer_size: 4096,
     brotli_quality: 9, //11, //9 seems to be a good tradeoff...changing q doesn't seem to make much diff though?
-    brotli_window: 22
+    brotli_window: 22,
 };
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CompressedFileInfo {
-    pub brotli_start : u64,
-    pub decompression_info_start : u64,
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DecompressionInfo {
@@ -150,6 +146,37 @@ pub fn verify_images(input_folder : &str, output_folder : &str) -> bool
     }
 
     return true;
+}
+
+pub fn get_byte_of_u64(value : u64, which_byte : usize) -> u8
+{
+    return (value >> (which_byte * 8)) as u8;
+}
+
+pub fn get_u64_mask_of_byte(value: u8, which_byte : usize) -> u64
+{
+    return (value as u64) << (which_byte * 8);
+}
+
+pub fn u64_to_u8_buf_little_endian(value : u64) -> [u8; 8]
+{
+    let mut buf = [0; 8];
+    for i in 0..8
+    {
+        buf[i] = get_byte_of_u64(value, i);
+    }
+    buf
+}
+
+//convert 8 bytes from a 8 byte array into a u32 value, little endian
+pub fn u8_buf_to_u64_little_endian(buf : &[u8; 8]) -> u64
+{
+    let mut returned_value = 0;
+    for i in 0..8
+    {
+        returned_value |= get_u64_mask_of_byte(buf[i], i);
+    }
+    returned_value
 }
 
 //convert 4 bytes from a 4 byte array into a u32 value, big endian

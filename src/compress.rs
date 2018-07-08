@@ -15,12 +15,13 @@ use image;
 use image::{RgbaImage, GenericImage};
 use walkdir::WalkDir;
 
-use common::{CompressedFileInfo, CompressedImageInfo, DecompressionInfo};
+use common::{CompressedImageInfo, DecompressionInfo};
 use common::CANVAS_SETTING;
 use common::subtract_image_from_canvas;
 use common::offset_to_bottom_center_image;
 use common::scan_folder_for_max_png_size;
-
+use common::u64_to_u8_buf_little_endian;
+use common::FILE_FORMAT_HEADER_LENGTH;
 
 struct CroppedImageBounds {
     x : u32,
@@ -81,9 +82,9 @@ where T: std::io::Write
 
 
 /// File format is as follows:
-/// [1000 bytes] - variable JSON string containing a CompressedFileInfo struct
-/// [Variable Length] -  brotli compressed image data. Start location encoded in the CompressedFileInfo struct
-/// [Variable Length] - JSON encoded metadata for each image. Start location encoded in the CompressedFileInfo struct
+/// [8 bytes BigE 64u = X]  - a Big Endian, 64u value indicating the length of the CompressedFileInfo JSON at the end of the file
+/// [Variable Length]       -  Brotli compressed image data.
+/// [X bytes long]          - JSON encoded DecompressionInfo struct. Length given in first 4 bytes of the file.
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
 pub fn compress_path(brotli_archive_path : &str, metadata_path : &str, debug_mode : bool)
 {
@@ -110,7 +111,8 @@ will be forced to 255 for .png output
     let mut f = File::create(brotli_archive_path).expect("Cannot create file");
 
     //allocate some space to record how long the brotli compressed data is
-    f.write(&['\n' as u8; 1000]);
+    f.write(&[0; FILE_FORMAT_HEADER_LENGTH]);
+
     let brotli_start_position = f.seek(SeekFrom::Current(0)).unwrap();
 
     {
@@ -227,28 +229,21 @@ will be forced to 255 for .png output
         }
     }
 
-    let decompression_info_start = f.seek(SeekFrom::Current(0)).unwrap();
-
+    //Save decompression info to file, and record its length
     let decompression_info = DecompressionInfo {
-        canvas_size : (canvas_width, canvas_height),
-        images_info : images_meta_info,
+        canvas_size: (canvas_width, canvas_height),
+        images_info: images_meta_info,
     };
 
     //saving meta info
+    let decompression_info_start = f.seek(SeekFrom::Current(0)).unwrap();
+    println!("Decompression Info starts at position {}", decompression_info_start);
     let serialized = serde_json::to_string(&decompression_info).unwrap();
     println!("serialized = {}", serialized);
     f.write(serialized.as_bytes()).expect("Unable to write metadata file");
 
     //return to start of file to write header info
     f.seek(SeekFrom::Start(0));
-
-    //saving meta info
-    let compressed_file_info = CompressedFileInfo {
-        brotli_start : brotli_start_position,
-        decompression_info_start : decompression_info_start,
-    };
-
-    let serialized = serde_json::to_string(&compressed_file_info).unwrap();
-    f.write(serialized.as_bytes()).expect("Unable to write metadata file");
+    f.write(&u64_to_u8_buf_little_endian(decompression_info_start));
 
 }
