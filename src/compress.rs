@@ -84,6 +84,7 @@ where T: std::io::Write
 /// [Variable Length]       -  Brotli compressed image data.
 /// [X bytes long]          - JSON encoded DecompressionInfo struct. Length given in first 4 bytes of the file.
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
+//Note: json is always stored uncompressed!
 pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : bool)
 {
     let brotli_quality = 11;
@@ -195,15 +196,33 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
     } else {
         bincode::serialize(&decompression_info).unwrap()
     };
-    let metadata_as_percentage_of_total = (serialized.len() as f64)/( (serialized.len() as f64 + decompression_info_start as f64)) * 100.0;
-    let metadata_length_bytes = serialized.len();
-    f.write(&serialized).expect("Unable to write metadata file");
+
+    if use_json {
+        f.write(&serialized).expect("Unable to write metadata file");
+    }
+    else {
+        let mut compressor = brotli::CompressorWriter::new(
+            &f,
+            BROTLI_BUFFER_SIZE,
+            brotli_quality,
+            brotli_window);
+        compressor.write(&serialized).expect("Unable to write decompression info (brotli compressed)");
+    }
+
+    //save some information about the compression before writing header at start of file
+    let uncompressed_metadata_size =  serialized.len();
+    let total_file_size = f.seek(SeekFrom::Current(0)).unwrap();
+    let metadata_length_bytes = total_file_size - decompression_info_start;
+    let metadata_as_percentage_of_total = metadata_length_bytes as f64 / total_file_size as f64 * 100.0;
 
     //return to start of file to write header info
     f.seek(SeekFrom::Start(0)).unwrap();
     f.write(&u64_to_u8_buf_little_endian(decompression_info_start)).expect("Unable to write header info to file");
 
-    println!("Compression Finished!");
-    println!("Total archive size is {}mbytes", f.seek(SeekFrom::End(0)).unwrap() as f64 / 1e6);
-    println!("Metadata is {} kbytes, {}% of total", metadata_length_bytes as f64 / 1000.0, metadata_as_percentage_of_total);
+    println!("\n\n ------------ Compression Finished! ------------");
+    println!("Total archive size is {}mbytes", total_file_size as f64 / 1e6);
+    println!("Metadata is {} kbytes ({} uncompressed), {}% of total",
+             metadata_length_bytes as f64 / 1000.0,
+             uncompressed_metadata_size as f64 / 1000.0,
+             metadata_as_percentage_of_total);
 }

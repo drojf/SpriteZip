@@ -41,13 +41,13 @@ fn main()
 {
     //Use command line arguments to set program mode
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 { println!("Not enough arguments! Please run as 'spritezip [compress|extract|test|alphablend]'"); return; }
+    if args.len() < 2 { println!("Not enough arguments! Please run as 'spritezip [compress|extract|verify|selftest|alphablend]'"); return; }
 
     let mode = &args[1];
-    let do_brotli_compression       = mode == "test" || mode == "compress";
-    let do_brotli_extract           = mode == "test" || mode == "extract" ;
-    let do_brotli_verify            = mode == "test";
-    let do_onscripter_alphablend    = mode == "alphablend";
+    let do_brotli_compression       = mode == "selftest" || mode == "compress"; //compresses the input folder into a .brotli file
+    let do_brotli_extract           = mode == "selftest" || mode == "extract" ; //extracts the .brotli file to the output folder
+    let do_brotli_verify            = mode == "selftest" || mode == "verify";   //verifies the input images are identical to the output images (does not check for extra images in output folder)
+    let do_onscripter_alphablend    = mode == "alphablend";                     //converts images to nscripter alphablend format from the input folder to the output folder
 
     //create input images folder if it doesn't already exist:
     let input_path = Path::new("input_images");

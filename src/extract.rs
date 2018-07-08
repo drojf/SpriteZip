@@ -34,7 +34,10 @@ pub fn extract_archive(brotli_archive_path : &str, use_json : bool, debug_mode :
     let decompression_info : DecompressionInfo = if use_json {
         serde_json::from_reader(&brotli_file).unwrap()
     } else {
-        bincode::deserialize_from(&brotli_file).unwrap()
+        let mut decompression_info_decompressor = brotli::Decompressor::new(&brotli_file, BROTLI_BUFFER_SIZE);
+        let mut raw_decompression_info = Vec::new();
+        decompression_info_decompressor.read_to_end(&mut raw_decompression_info).unwrap();
+        bincode::deserialize(&raw_decompression_info).unwrap()
     };
 
     let canvas_width = decompression_info.canvas_size.0;
