@@ -1,7 +1,6 @@
 //standard uses
 use std;
 use std::io::{Write};
-use std::fs;
 use std::fs::File;
 use time;
 use std::path::Path;
@@ -103,7 +102,7 @@ fn debug_save_image_no_alpha(mut image : RgbaImage, save_path : &str)
 /// [Variable Length]       -  Brotli compressed image data.
 /// [X bytes long]          - JSON encoded DecompressionInfo struct. Length given in first 4 bytes of the file.
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
-pub fn compress_path(brotli_archive_path : &str, metadata_path : &str, debug_mode : bool)
+pub fn compress_path(brotli_archive_path : &str, debug_mode : bool)
 {
     let (max_width, max_height) = scan_folder_for_max_png_size("input_images");
 
@@ -128,9 +127,7 @@ will be forced to 255 for .png output
     let mut f = File::create(brotli_archive_path).expect("Cannot create file");
 
     //allocate some space to record how long the brotli compressed data is
-    f.write(&[0; FILE_FORMAT_HEADER_LENGTH]);
-
-    let brotli_start_position = f.seek(SeekFrom::Current(0)).unwrap();
+    f.write(&[0; FILE_FORMAT_HEADER_LENGTH]).expect("Unable to allocate header space in file");
 
     {
         let mut compressor = brotli::CompressorWriter::new(
@@ -237,8 +234,8 @@ will be forced to 255 for .png output
     f.write(serialized.as_bytes()).expect("Unable to write metadata file");
 
     //return to start of file to write header info
-    f.seek(SeekFrom::Start(0));
-    f.write(&u64_to_u8_buf_little_endian(decompression_info_start));
+    f.seek(SeekFrom::Start(0)).unwrap();
+    f.write(&u64_to_u8_buf_little_endian(decompression_info_start)).expect("Unable to write header info to file");
 
     println!("Compression Finished!");
 }

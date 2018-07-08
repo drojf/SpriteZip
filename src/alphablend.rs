@@ -4,7 +4,7 @@ use std::fs;
 
 //nonstandard includes
 use image;
-use image::{RgbImage, GenericImage};
+use image::{RgbImage};
 use walkdir::WalkDir;
 
 fn convert_to_onscripter_alphablend(filepath : &str, save_path : &str)

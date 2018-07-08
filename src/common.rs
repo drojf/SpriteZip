@@ -192,7 +192,7 @@ pub fn u8_buf_to_u32_big_endian(buf : &[u8; 4]) -> u32
 pub fn u8_stream_to_u32_big_endian(reader : &mut Read) -> u32
 {
     let mut png_width_bytes  = [0u8; 4];
-    reader.read_exact(&mut png_width_bytes);
+    reader.read_exact(&mut png_width_bytes).unwrap();
     return u8_buf_to_u32_big_endian(&png_width_bytes);
 }
 
@@ -206,7 +206,7 @@ pub fn get_png_dimensions(reader : &mut Read) -> Result<(u32, u32), &'static str
     ];
 
     let mut actual_png_header = [0u8; 16];
-    reader.read_exact(&mut actual_png_header); //read the first 16 bytes
+    reader.read_exact(&mut actual_png_header).unwrap(); //read the first 16 bytes
 
     if reference_png_header != actual_png_header {
         return Err("Incorrect PNG header");

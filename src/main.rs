@@ -35,7 +35,6 @@ use common::verify_images;
 //standard uses
 use std::path::{Path};
 use std::io;
-use std::fs;
 
 fn pause()
 {
@@ -57,18 +56,17 @@ fn main()
 
     let output_basename = "compressed_images";
     let brotli_archive_path = format!("{}.brotli", output_basename);
-    let metadata_path = format!("{}.metadata", output_basename);
 
     if do_brotli_compression
     {
         println!("\n\n ---------- Begin Compression... ---------- ");
-        compress_path(&brotli_archive_path, &metadata_path, false);
+        compress_path(&brotli_archive_path, false);
     }
 
     if do_brotli_extract
     {
         println!("\n\n ---------- Begin Extraction... ---------- ");
-        extract_archive(&brotli_archive_path, &metadata_path, false);
+        extract_archive(&brotli_archive_path, false);
     }
 
     if do_brotli_verify
