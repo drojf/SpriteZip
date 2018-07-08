@@ -257,7 +257,9 @@ pub fn save_image_no_alpha(mut image : RgbaImage, save_path : &str)
 
 pub fn convert_pixel_based_to_channel_based(pixel_based_image : Vec<u8>, dimensions : (u32, u32)) -> Vec<u8>
 {
-    if false
+    let channel_size = pixel_based_image.len()/4;
+
+    if true
     {
         let mut channel_based_image = Vec::with_capacity(pixel_based_image.len());
         println!("Block compression");
@@ -290,14 +292,14 @@ pub fn convert_pixel_based_to_channel_based(pixel_based_image : Vec<u8>, dimensi
                 }
             }
         }
+
         println!("compression legnth is {}", channel_based_image.len());
         return channel_based_image;
     }
-    else if true
+    else if false
     {
         let mut channel_based_image = Vec::with_capacity(pixel_based_image.len());
         println!("Alpha Compression");
-        let channel_size = pixel_based_image.len()/4;
 
         ////////////////// RGB + A encoding///////////////////////
         //extract RGB channels from image
@@ -324,7 +326,9 @@ pub fn convert_pixel_based_to_channel_based(pixel_based_image : Vec<u8>, dimensi
 
 pub fn convert_channel_based_to_pixel_based(channel_based_image : Vec<u8>, dimensions : (u32, u32)) -> Vec<u8>
 {
-    if false
+    let channel_size = channel_based_image.len()/4;
+
+    if true
     {
         let mut pixel_based_image = vec![0; channel_based_image.len()];
 
@@ -364,11 +368,10 @@ pub fn convert_channel_based_to_pixel_based(channel_based_image : Vec<u8>, dimen
         println!("decompression legnth is {}", channel_index);
         return pixel_based_image;
     }
-    else if true
+    else if false
     {
         let mut pixel_based_image = Vec::with_capacity(channel_based_image.len());
         println!("Alpha Compression");
-        let channel_size = channel_based_image.len()/4;
         println!("Channel size is {}", channel_size);
         ////////////////// RGB + A decoding///////////////////////
         //extract one pixel at a time from the channel based image
