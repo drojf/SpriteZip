@@ -80,6 +80,23 @@ where T: std::io::Write
     if print_execution_time { println!("Brotli compression took {} seconds", brotli_start.to(brotli_end)); }
 }
 
+fn debug_save_image_no_alpha(mut image : RgbaImage, save_path : &str)
+{
+    println!("Saving .png");
+    for pixel in image.pixels_mut()
+    {
+        *pixel = image::Rgba([
+            pixel[0],
+            pixel[1],
+            pixel[2],
+            255
+        ]);
+    }
+
+    let save_path = Path::new("debug_images").join(save_path);
+    println!("Will save image to: {}", save_path.to_str().unwrap());
+    image.save(save_path).unwrap()
+}
 
 /// File format is as follows:
 /// [8 bytes BigE 64u = X]  - a Big Endian, 64u value indicating the length of the CompressedFileInfo JSON at the end of the file
@@ -148,21 +165,16 @@ will be forced to 255 for .png output
 
             println!("Original Image width is {} height is {}", img.width(), img.height());
 
-            //TODO: check if input image is larger than the canvas
-
             //Calculate image offset such that image is placed at the center bottom of the canvas.
             let (x_offset, y_offset) = offset_to_bottom_center_image(&canvas, &img);
 
             if debug_mode { println!("Subtracting images"); }
             subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset);
 
-            //TODO: crop diff
             let cropped_image_bounds = crop_function(&canvas,
                                                          x_offset, y_offset,
                                                          img.width(), img.height());
 
-            //Note: a copy occurs here, for simplicity, so that the cropped image can be saved/compressed
-            // As the cropped diff is usually small, this shouldn't have much impact on performance
             let cropped_image = if crop_enabled
             {
                 image::imageops::crop(&mut canvas,
@@ -178,11 +190,11 @@ will be forced to 255 for .png output
             let cropped_image_size = cropped_image.len();
 
             images_meta_info.push(CompressedImageInfo{
-                start_index: current_start_index,   //where in the compressed data stream the image starts
-                x: cropped_image_bounds.x,             //where on the canvas the diff should be placed (NEEDS UPDATE
-                y: cropped_image_bounds.y,            //(NEEDS UPDATE
-                diff_width: cropped_image_bounds.width,     //NEEDS UPDATE the width and height of the diff image
-                diff_height: cropped_image_bounds.height,  // NEEDS UPDATE
+                start_index: current_start_index,       //where in the compressed data stream the image starts
+                x: cropped_image_bounds.x,              //where on the canvas the diff should be placed (NEEDS UPDATE
+                y: cropped_image_bounds.y,
+                diff_width: cropped_image_bounds.width,     //the width and height of the diff image
+                diff_height: cropped_image_bounds.height,
                 output_width: img.width(),   //the width and height of the reconstructed image
                 output_height: img.height(),
                 output_path: String::from(path_relative_to_input_folder),
@@ -193,24 +205,7 @@ will be forced to 255 for .png output
             println!("Image size is {},  width is {} height is {}", cropped_image_size, cropped_image_bounds.width, cropped_image_bounds.height);
 
             //save diff image as png for debugging reasons
-            if debug_mode
-            {
-                println!("Saving .png");
-                let mut cropped_image_copy = cropped_image.clone();
-                for pixel in cropped_image_copy.pixels_mut()
-                {
-                    *pixel = image::Rgba([
-                        pixel[0],
-                        pixel[1],
-                        pixel[2],
-                        255
-                    ]);
-                }
-
-                let save_path = Path::new("debug_images").join(path_relative_to_input_folder);
-                println!("Will save image to: {}", save_path.to_str().unwrap());
-                cropped_image_copy.save(save_path).unwrap()
-            }
+            if debug_mode { debug_save_image_no_alpha(cropped_image.clone(), path_relative_to_input_folder); }
 
             // Compress the the diff image (or 'normal' image for first image)
             // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
@@ -218,7 +213,7 @@ will be forced to 255 for .png output
             let cropped_image_as_raw = cropped_image.into_raw();
             save_brotli_image(&mut compressor, &cropped_image_as_raw, true);
 
-            //clear canvas (there must be a better way to do this?
+            //clear canvas
             canvas = RgbaImage::new(canvas_width, canvas_height);
 
             //copy the original image onto canvas for next iteration
@@ -239,11 +234,11 @@ will be forced to 255 for .png output
     let decompression_info_start = f.seek(SeekFrom::Current(0)).unwrap();
     println!("Decompression Info starts at position {}", decompression_info_start);
     let serialized = serde_json::to_string(&decompression_info).unwrap();
-    println!("serialized = {}", serialized);
     f.write(serialized.as_bytes()).expect("Unable to write metadata file");
 
     //return to start of file to write header info
     f.seek(SeekFrom::Start(0));
     f.write(&u64_to_u8_buf_little_endian(decompression_info_start));
 
+    println!("Compression Finished!");
 }
