@@ -83,8 +83,8 @@ where T: std::io::Write
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
 pub fn compress_path(brotli_archive_path : &str, debug_mode : bool)
 {
-    let brotli_quality = 9;
-    let brotli_window = 22;
+    let brotli_quality = 11;
+    let brotli_window = 24;
 
     let (max_width, max_height) = scan_folder_for_max_png_size("input_images");
     let canvas_width  = (max_width + 1)  & !0x1;

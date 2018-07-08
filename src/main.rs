@@ -43,9 +43,9 @@ fn main()
     if args.len() < 2 { println!("Not enough arguments! Please run as 'spritezip [compress|extract|test|alphablend]'"); return; }
 
     let mode = &args[1];
-    let do_brotli_compression       = mode == "compress" || mode == "test";
-    let do_brotli_extract           = mode == "extract"  || mode == "test";
-    let do_brotli_verify            = mode == "compress" || mode == "test";
+    let do_brotli_compression       = mode == "test" || mode == "compress";
+    let do_brotli_extract           = mode == "test" || mode == "extract" ;
+    let do_brotli_verify            = mode == "test";
     let do_onscripter_alphablend    = mode == "alphablend";
 
     //create input images folder if it doesn't already exist:
