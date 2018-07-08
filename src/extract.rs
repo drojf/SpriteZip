@@ -7,6 +7,7 @@ use std::io::Seek;
 
 use brotli;
 use serde_json;
+use bincode;
 use image::{imageops, RgbaImage, GenericImage};
 
 use common::{DecompressionInfo};
@@ -16,7 +17,7 @@ use common::u8_buf_to_u64_little_endian;
 use common::{FILE_FORMAT_HEADER_LENGTH, BROTLI_BUFFER_SIZE};
 use common::{convert_channel_based_to_pixel_based};
 
-pub fn extract_archive(brotli_archive_path : &str, debug_mode : bool) {
+pub fn extract_archive(brotli_archive_path : &str, use_json : bool, debug_mode : bool) {
     //open the brotli file for reading
     let mut brotli_file = fs::File::open(brotli_archive_path).unwrap();
 
@@ -30,7 +31,12 @@ pub fn extract_archive(brotli_archive_path : &str, debug_mode : bool) {
         brotli_file.seek(SeekFrom::Start(decompression_info_start)).unwrap()
     );
 
-    let decompression_info : DecompressionInfo = serde_json::from_reader(&brotli_file).unwrap();
+    let decompression_info : DecompressionInfo = if use_json {
+        serde_json::from_reader(&brotli_file).unwrap()
+    } else {
+        bincode::deserialize_from(&brotli_file).unwrap()
+    };
+
     let canvas_width = decompression_info.canvas_size.0;
     let canvas_height = decompression_info.canvas_size.1;
     let metadata_list = &decompression_info.images_info;

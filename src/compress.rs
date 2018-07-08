@@ -8,6 +8,8 @@ use std::io::Seek;
 
 //non-standard use
 use serde_json;
+use bincode;
+
 use brotli;
 use image;
 use image::{RgbaImage, GenericImage};
@@ -82,7 +84,7 @@ where T: std::io::Write
 /// [Variable Length]       -  Brotli compressed image data.
 /// [X bytes long]          - JSON encoded DecompressionInfo struct. Length given in first 4 bytes of the file.
 //output_basename is the name of the brotli/metadatafiles, without the file extension (eg "a" will produce "a.brotli" and "a.metadata"
-pub fn compress_path(brotli_archive_path : &str, debug_mode : bool)
+pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : bool)
 {
     let brotli_quality = 11;
     let brotli_window = 24;
@@ -187,12 +189,21 @@ pub fn compress_path(brotli_archive_path : &str, debug_mode : bool)
     //saving meta info
     let decompression_info_start = f.seek(SeekFrom::Current(0)).unwrap();
     println!("Decompression Info starts at position {}", decompression_info_start);
-    let serialized = serde_json::to_string(&decompression_info).unwrap();
-    f.write(serialized.as_bytes()).expect("Unable to write metadata file");
+
+    let serialized : Vec<u8> =  if use_json {
+        serde_json::to_vec(&decompression_info).unwrap()
+    } else {
+        bincode::serialize(&decompression_info).unwrap()
+    };
+    let metadata_as_percentage_of_total = (serialized.len() as f64)/( (serialized.len() as f64 + decompression_info_start as f64)) * 100.0;
+    let metadata_length_bytes = serialized.len();
+    f.write(&serialized).expect("Unable to write metadata file");
 
     //return to start of file to write header info
     f.seek(SeekFrom::Start(0)).unwrap();
     f.write(&u64_to_u8_buf_little_endian(decompression_info_start)).expect("Unable to write header info to file");
 
     println!("Compression Finished!");
+    println!("Total archive size is {}mbytes", f.seek(SeekFrom::End(0)).unwrap() as f64 / 1e6);
+    println!("Metadata is {} kbytes, {}% of total", metadata_length_bytes as f64 / 1000.0, metadata_as_percentage_of_total);
 }

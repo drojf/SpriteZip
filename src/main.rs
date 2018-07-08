@@ -16,6 +16,7 @@ extern crate serde_derive;
 
 extern crate serde;
 extern crate serde_json;
+extern crate bincode;
 
 //external crates
 extern crate image;
@@ -58,13 +59,13 @@ fn main()
     if do_brotli_compression
     {
         println!("\n\n ---------- Begin Compression... ---------- ");
-        compress_path(&brotli_archive_path, false);
+        compress_path(&brotli_archive_path, false, false);
     }
 
     if do_brotli_extract
     {
         println!("\n\n ---------- Begin Extraction... ---------- ");
-        extract_archive(&brotli_archive_path, false);
+        extract_archive(&brotli_archive_path, false, false);
     }
 
     if do_brotli_verify
