@@ -34,18 +34,23 @@ use common::verify_images;
 
 //standard uses
 use std::path::{Path};
+use std::env;
 
 fn main()
 {
+    //Use command line arguments to set program mode
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 { println!("Not enough arguments! Please run as 'spritezip [compress|extract|test|alphablend]'"); return; }
+
+    let mode = &args[1];
+    let do_brotli_compression       = mode == "compress" || mode == "test";
+    let do_brotli_extract           = mode == "extract"  || mode == "test";
+    let do_brotli_verify            = mode == "compress" || mode == "test";
+    let do_onscripter_alphablend    = mode == "alphablend";
+
     //create input images folder if it doesn't already exist:
     let input_path = Path::new("input_images");
     std::fs::create_dir_all(input_path).unwrap();
-
-    let do_brotli_compression = true;
-    let do_brotli_extract = true;
-    let do_brotli_verify = true;
-
-    let do_onscripter_alphablend = false;
 
     let output_basename = "compressed_images";
     let brotli_archive_path = format!("{}.brotli", output_basename);
