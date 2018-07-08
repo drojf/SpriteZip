@@ -1,4 +1,5 @@
 use image;
+use image::RgbaImage;
 use walkdir::WalkDir;
 use std;
 use std::path::Path;
@@ -49,11 +50,11 @@ pub struct CompressedImageInfo {
 /// than the canvas
 /// Eg: Performs [image - canvas] for all pixels in image.
 /// x_offset, y_offset: offsets image before performing the subtraction
-pub fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, x_offset : u32, y_offset : u32)
+pub fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, offset : (u32, u32))
 {
     for (x, y, pixel) in img.enumerate_pixels()
     {
-        let mut canvas_pixel = canvas.get_pixel_mut(x + x_offset, y + y_offset);
+        let mut canvas_pixel = canvas.get_pixel_mut(x + offset.0, y + offset.1);
 
         //TODO: disable debug mode to use alpha value
         //must specify u8 to ensure wrapping occurs
@@ -245,4 +246,22 @@ pub fn scan_folder_for_max_png_size(input_folder : &str) -> (u32, u32)
     }
 
     (max_width, max_height)
+}
+
+pub fn save_image_no_alpha(mut image : RgbaImage, save_path : &str)
+{
+    println!("WARNING: Saving {} in Debug Mode: Alpha channel ignored!", save_path);
+    for pixel in image.pixels_mut()
+    {
+        *pixel = image::Rgba([
+            pixel[0],
+            pixel[1],
+            pixel[2],
+            255
+        ]);
+    }
+
+    let save_path = Path::new("debug_images").join(save_path);
+    println!("Will save image to: {}", save_path.to_str().unwrap());
+    image.save(save_path).unwrap()
 }

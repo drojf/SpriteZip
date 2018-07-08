@@ -3,7 +3,6 @@ use std;
 use std::io::{Write};
 use std::fs::File;
 use time;
-use std::path::Path;
 use std::io::SeekFrom;
 use std::io::Seek;
 
@@ -21,6 +20,7 @@ use common::offset_to_bottom_center_image;
 use common::scan_folder_for_max_png_size;
 use common::u64_to_u8_buf_little_endian;
 use common::FILE_FORMAT_HEADER_LENGTH;
+use common::save_image_no_alpha;
 
 struct CroppedImageBounds {
     x : u32,
@@ -40,13 +40,13 @@ struct CroppedImageBounds {
 /// (the x and y offset and max width/height let you specify a subimage in which to find the bounding box of the image)
 /// return value: the bounding box of the image (given as offset & size). Note that the returned
 /// coordinates are in absolute coordinates, not relative to the x_offset and y_offset input values
-fn crop_function(img: &image::RgbaImage, x_offset : u32, y_offset : u32, max_width : u32, max_height : u32) -> CroppedImageBounds
+fn crop_function(img: &image::RgbaImage, offset : (u32, u32), max_width : u32, max_height : u32) -> CroppedImageBounds
 {
     //TODO: figure out a better rusty way to do this
-    let mut x0 = x_offset + (max_width-1); //img.width();
-    let mut x1 = x_offset; //std::u32::MAX;
-    let mut y0 = y_offset + (max_height-1); //img.height();
-    let mut y1 = y_offset; //std::u32::MAX;
+    let mut x0 = offset.0 + (max_width-1);
+    let mut x1 = offset.0;
+    let mut y0 = offset.1 + (max_height-1);
+    let mut y1 = offset.1;
 
     for (x, y, pixel) in img.enumerate_pixels()
     {
@@ -79,24 +79,6 @@ where T: std::io::Write
     if print_execution_time { println!("Brotli compression took {} seconds", brotli_start.to(brotli_end)); }
 }
 
-fn debug_save_image_no_alpha(mut image : RgbaImage, save_path : &str)
-{
-    println!("Saving .png");
-    for pixel in image.pixels_mut()
-    {
-        *pixel = image::Rgba([
-            pixel[0],
-            pixel[1],
-            pixel[2],
-            255
-        ]);
-    }
-
-    let save_path = Path::new("debug_images").join(save_path);
-    println!("Will save image to: {}", save_path.to_str().unwrap());
-    image.save(save_path).unwrap()
-}
-
 /// File format is as follows:
 /// [8 bytes BigE 64u = X]  - a Big Endian, 64u value indicating the length of the CompressedFileInfo JSON at the end of the file
 /// [Variable Length]       -  Brotli compressed image data.
@@ -105,24 +87,13 @@ fn debug_save_image_no_alpha(mut image : RgbaImage, save_path : &str)
 pub fn compress_path(brotli_archive_path : &str, debug_mode : bool)
 {
     let (max_width, max_height) = scan_folder_for_max_png_size("input_images");
-
-    println!("max width: {} max_height: {}", max_width, max_height);
-
     let canvas_width  = (max_width + 1)  & !0x1;
     let canvas_height = (max_height + 1) & !0x1;
+    println!("max image size: ({},{})\nchosen canvas size: ({},{})", max_width, max_height, canvas_width, canvas_height);
 
     let mut current_start_index : usize = 0;
 
     let mut images_meta_info = Vec::new();
-
-    let crop_enabled = true;
-    if debug_mode {
-        println!("-----------
-Warning: Debug mode is enabled - alpha channel
-will be forced to 255 for .png output
------------
-    ");
-    }
 
     let mut f = File::create(brotli_archive_path).expect("Cannot create file");
 
@@ -156,32 +127,21 @@ will be forced to 255 for .png output
             let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
 
             println!("\nProcessing Image {}: '{}'", count, ent.path().display());
-
             let img_dyn = image::open(ent.path()).unwrap();
             let img = img_dyn.as_rgba8().unwrap();
-
             println!("Original Image width is {} height is {}", img.width(), img.height());
 
-            //Calculate image offset such that image is placed at the center bottom of the canvas.
-            let (x_offset, y_offset) = offset_to_bottom_center_image(&canvas, &img);
+            if debug_mode { println!("Subtracting image from bottom center of canvas, then cropping image "); }
+            let offset_from_bottom_center = offset_to_bottom_center_image(&canvas, &img);
+            subtract_image_from_canvas(&mut canvas, &img, offset_from_bottom_center);
 
-            if debug_mode { println!("Subtracting images"); }
-            subtract_image_from_canvas(&mut canvas, &img, x_offset, y_offset);
+            let cropped_image_bounds =
+                crop_function(&canvas, offset_from_bottom_center, img.width(), img.height());
 
-            let cropped_image_bounds = crop_function(&canvas,
-                                                         x_offset, y_offset,
-                                                         img.width(), img.height());
-
-            let cropped_image = if crop_enabled
-            {
+            let cropped_image =
                 image::imageops::crop(&mut canvas,
-                                  cropped_image_bounds.x, cropped_image_bounds.y,
-                                  cropped_image_bounds.width, cropped_image_bounds.height).to_image()
-            }
-            else
-            {
-                canvas.clone()
-            };
+                cropped_image_bounds.x, cropped_image_bounds.y,
+                cropped_image_bounds.width, cropped_image_bounds.height).to_image();
 
             //save meta info
             let cropped_image_size = cropped_image.len();
@@ -202,7 +162,7 @@ will be forced to 255 for .png output
             println!("Image size is {},  width is {} height is {}", cropped_image_size, cropped_image_bounds.width, cropped_image_bounds.height);
 
             //save diff image as png for debugging reasons
-            if debug_mode { debug_save_image_no_alpha(cropped_image.clone(), path_relative_to_input_folder); }
+            if debug_mode { save_image_no_alpha(cropped_image.clone(), path_relative_to_input_folder); }
 
             // Compress the the diff image (or 'normal' image for first image)
             // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
@@ -210,11 +170,9 @@ will be forced to 255 for .png output
             let cropped_image_as_raw = cropped_image.into_raw();
             save_brotli_image(&mut compressor, &cropped_image_as_raw, true);
 
-            //clear canvas
+            // Prepare for next iteration by clearing canvas, then copying the 'original' image for the next diff
             canvas = RgbaImage::new(canvas_width, canvas_height);
-
-            //copy the original image onto canvas for next iteration
-            canvas.copy_from(img, x_offset, y_offset);
+            canvas.copy_from(img, offset_from_bottom_center.0, offset_from_bottom_center.1);
 
 
             count += 1;
