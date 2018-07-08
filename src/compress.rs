@@ -20,6 +20,7 @@ use common::scan_folder_for_max_png_size;
 use common::u64_to_u8_buf_little_endian;
 use common::save_image_no_alpha;
 use common::{FILE_FORMAT_HEADER_LENGTH, BROTLI_BUFFER_SIZE};
+use common::{convert_pixel_based_to_channel_based};
 
 struct CroppedImageBounds {
     x : u32,
@@ -164,7 +165,9 @@ pub fn compress_path(brotli_archive_path : &str, debug_mode : bool)
             // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
             // However subsequent RgbaImage::new assigns a new value to the canvas each iteration
             let cropped_image_as_raw = cropped_image.into_raw();
-            save_brotli_image(&mut compressor, &cropped_image_as_raw, true);
+            save_brotli_image(&mut compressor,
+                              &convert_pixel_based_to_channel_based(cropped_image_as_raw, (cropped_image_bounds.width, cropped_image_bounds.height)),
+                              true);
 
             // Prepare for next iteration by clearing canvas, then copying the 'original' image for the next diff
             canvas = RgbaImage::new(canvas_width, canvas_height);

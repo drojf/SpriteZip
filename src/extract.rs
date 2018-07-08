@@ -14,6 +14,7 @@ use common::add_image_to_canvas;
 use common::offset_to_bottom_center_image_value;
 use common::u8_buf_to_u64_little_endian;
 use common::{FILE_FORMAT_HEADER_LENGTH, BROTLI_BUFFER_SIZE};
+use common::{convert_channel_based_to_pixel_based};
 
 pub fn extract_archive(brotli_archive_path : &str, debug_mode : bool) {
     //open the brotli file for reading
@@ -49,19 +50,20 @@ pub fn extract_archive(brotli_archive_path : &str, debug_mode : bool) {
     let mut brotli_data_ptr = 0;
     for metadata in metadata_list
     {
-        println!("{:?}", metadata);
+        println!("Extracting Image {} - meta: {:?}", count, metadata);
 
         let expected_size = metadata.diff_width as usize * metadata.diff_height as usize * 4; //RGBA image = 4 byte/pixel
         brotli_data_ptr += expected_size;
         println!("expected size: {} expected next image start {}", expected_size, brotli_data_ptr);
 
         //partially decompress the brotli file
-        let mut raw_image_data = vec![0; expected_size];
+        let mut raw_image_data_channel_based = vec![0; expected_size];
         //TODO: add erorr check here? see https://doc.rust-lang.org/std/io/trait.Read.html
-        extractor.read_exact(&mut raw_image_data).unwrap();
+        extractor.read_exact(&mut raw_image_data_channel_based).unwrap();
+        let mut raw_image_data = convert_channel_based_to_pixel_based(raw_image_data_channel_based, (metadata.diff_width, metadata.diff_height));
 
         //debug: interpret the raw data as an image and save to file
-        let diff_image = RgbaImage::from_raw(metadata.diff_width, metadata.diff_height, raw_image_data).unwrap();
+        let diff_image = RgbaImage::from_raw(metadata.diff_width, metadata.diff_height, raw_image_data).expect("diff image could not be created from raw image");
 
         if debug_mode { diff_image.save(format!("{}.png", count)).unwrap(); }
 

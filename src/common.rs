@@ -254,3 +254,136 @@ pub fn save_image_no_alpha(mut image : RgbaImage, save_path : &str)
     println!("Will save image to: {}", save_path.to_str().unwrap());
     image.save(save_path).unwrap()
 }
+
+pub fn convert_pixel_based_to_channel_based(pixel_based_image : Vec<u8>, dimensions : (u32, u32)) -> Vec<u8>
+{
+    if false
+    {
+        let mut channel_based_image = Vec::with_capacity(pixel_based_image.len());
+        println!("Block compression");
+        let target_block_size = 50;
+        let x_num_normal_blocks = dimensions.0 / target_block_size + 1; //always do one extra, even if not needed (for now)
+        let y_num_normal_blocks = dimensions.1 / target_block_size + 1; //always do one extra, even if not needed (for now)
+
+        for y_block_i in 0..y_num_normal_blocks
+        {
+            for x_block_i in 0..x_num_normal_blocks
+            {
+                for block_y_pixel_ind in 0..target_block_size
+                {
+                    for block_x_pixel_ind in 0..target_block_size
+                    {
+                        let y_index = y_block_i * target_block_size + block_y_pixel_ind;
+                        let x_index = x_block_i * target_block_size + block_x_pixel_ind;
+
+                        //check in range
+                        if x_index >= dimensions.0 || y_index >= dimensions.1 {
+                            continue
+                        }
+
+                        let pixel_ind = (x_index + y_index * dimensions.0) as usize;
+                        channel_based_image.push(pixel_based_image[4 * pixel_ind + 0]);
+                        channel_based_image.push(pixel_based_image[4 * pixel_ind + 1]);
+                        channel_based_image.push(pixel_based_image[4 * pixel_ind + 2]);
+                        channel_based_image.push(pixel_based_image[4 * pixel_ind + 3]);
+                    }
+                }
+            }
+        }
+        println!("compression legnth is {}", channel_based_image.len());
+        return channel_based_image;
+    }
+    else if true
+    {
+        let mut channel_based_image = Vec::with_capacity(pixel_based_image.len());
+        println!("Alpha Compression");
+        let channel_size = pixel_based_image.len()/4;
+
+        ////////////////// RGB + A encoding///////////////////////
+        //extract RGB channels from image
+        for index_in_channel in 0..channel_size
+        {
+            channel_based_image.push(pixel_based_image[index_in_channel*4 + 0]);
+            channel_based_image.push(pixel_based_image[index_in_channel*4 + 1]);
+            channel_based_image.push(pixel_based_image[index_in_channel*4 + 2]);
+        }
+
+        println!("enc length is {}", channel_based_image.len());
+
+        //extract alpha channel only from image
+        for index_in_channel in 0..channel_size
+        {
+            channel_based_image.push(pixel_based_image[index_in_channel*4 + 3]);
+        }
+        println!("enc end is {}", channel_based_image.len());
+        return channel_based_image;
+    }
+
+    return pixel_based_image;
+}
+
+pub fn convert_channel_based_to_pixel_based(channel_based_image : Vec<u8>, dimensions : (u32, u32)) -> Vec<u8>
+{
+    if false
+    {
+        let mut pixel_based_image = vec![0; channel_based_image.len()];
+
+        println!("Block Compression");
+        let target_block_size = 50;
+        let x_num_normal_blocks = dimensions.0 / target_block_size + 1; //always do one extra, even if not needed (for now)
+        let y_num_normal_blocks = dimensions.1 / target_block_size + 1; //always do one extra, even if not needed (for now)
+
+        let mut channel_index: usize = 0;
+        for y_block_i in 0..y_num_normal_blocks
+        {
+            for x_block_i in 0..x_num_normal_blocks
+            {
+                for block_y_pixel_ind in 0..target_block_size
+                {
+                    for block_x_pixel_ind in 0..target_block_size
+                    {
+                        let y_index = y_block_i * target_block_size + block_y_pixel_ind;
+                        let x_index = x_block_i * target_block_size + block_x_pixel_ind;
+
+                        //check in range
+                        if x_index >= dimensions.0 || y_index >= dimensions.1 {
+                            continue
+                        }
+
+                        let pixel_ind = (x_index + y_index * dimensions.0) as usize;
+                        pixel_based_image[4 * pixel_ind + 0] = channel_based_image[channel_index + 0];
+                        pixel_based_image[4 * pixel_ind + 1] = channel_based_image[channel_index + 1];
+                        pixel_based_image[4 * pixel_ind + 2] = channel_based_image[channel_index + 2];
+                        pixel_based_image[4 * pixel_ind + 3] = channel_based_image[channel_index + 3];
+                        channel_index += 4;
+                    }
+                }
+            }
+        }
+
+        println!("decompression legnth is {}", channel_index);
+        return pixel_based_image;
+    }
+    else if true
+    {
+        let mut pixel_based_image = Vec::with_capacity(channel_based_image.len());
+        println!("Alpha Compression");
+        let channel_size = channel_based_image.len()/4;
+        println!("Channel size is {}", channel_size);
+        ////////////////// RGB + A decoding///////////////////////
+        //extract one pixel at a time from the channel based image
+        for index_in_channel in 0..channel_size
+        {
+            //stride is now 3 as is now a RGB image and then a ALPHA image
+            pixel_based_image.push(channel_based_image[index_in_channel * 3 + 0]);
+            pixel_based_image.push(channel_based_image[index_in_channel * 3 + 1]);
+            pixel_based_image.push(channel_based_image[index_in_channel * 3 + 2]);
+
+            pixel_based_image.push(channel_based_image[channel_size * 3 + index_in_channel]);
+        }
+        return pixel_based_image;
+    }
+
+
+    return channel_based_image;
+}
