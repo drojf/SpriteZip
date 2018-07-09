@@ -22,7 +22,7 @@ use common::scan_folder_for_max_png_size;
 use common::u64_to_u8_buf_little_endian;
 use common::save_image_no_alpha;
 use common::{FILE_FORMAT_HEADER_LENGTH, BROTLI_BUFFER_SIZE};
-use common::{convert_pixel_based_to_channel_based};
+use common::{convert_pixel_based_to_channel_based, compress_image_to_buffer, compress_buffer};
 
 struct CroppedImageBounds {
     x : u32,
@@ -42,7 +42,8 @@ struct CroppedImageBounds {
 /// (the x and y offset and max width/height let you specify a subimage in which to find the bounding box of the image)
 /// return value: the bounding box of the image (given as offset & size). Note that the returned
 /// coordinates are in absolute coordinates, not relative to the x_offset and y_offset input values
-fn crop_function(img: &image::RgbaImage, offset : (u32, u32), max_width : u32, max_height : u32) -> CroppedImageBounds
+/// returns number of pixels which are identical in both images
+fn crop_function(img: &image::RgbaImage, offset : (u32, u32), max_width : u32, max_height : u32) -> (CroppedImageBounds, u64)
 {
     //TODO: figure out a better rusty way to do this
     let mut x0 = offset.0 + (max_width-1);
@@ -50,21 +51,34 @@ fn crop_function(img: &image::RgbaImage, offset : (u32, u32), max_width : u32, m
     let mut y0 = offset.1 + (max_height-1);
     let mut y1 = offset.1;
 
+    let mut num_identical_pixels = 0u64;
     for (x, y, pixel) in img.enumerate_pixels()
     {
-        if pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0 || pixel[3] != 0
+        //todo: just make own for loop which just iterates over the required area instead of whole canvas
+        if x < offset.0 || y < offset.1 ||
+           x >= (offset.0 + max_width) || y >= (offset.1 + max_height)
+        {
+            continue
+        }
+
+        if *pixel != image::Rgba([0,0,0,0])
         {
             x0 = std::cmp::min(x, x0);
             y0 = std::cmp::min(y, y0);
             x1 = std::cmp::max(x, x1);
             y1 = std::cmp::max(y, y1);
         }
+        else
+        {
+            num_identical_pixels += 1;
+        }
     }
 
-    CroppedImageBounds {
+    (CroppedImageBounds {
         x: x0, y: y0,
         width: x1-x0+1, height: y1-y0+1,
-    }
+    },
+    num_identical_pixels)
 }
 
 /// Saves a raw canvas image using an external compressor
@@ -135,17 +149,66 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
             let img = img_dyn.as_rgba8().unwrap();
             println!("Original Image width is {} height is {}", img.width(), img.height());
 
+            //save raw image
+            let img_as_vec = img.clone().into_raw();
+            let save_path = std::path::Path::new("raw_images").join(path_relative_to_input_folder);
+            std::fs::create_dir_all(save_path.parent().unwrap()).unwrap();
+            std::fs::write(save_path, img_as_vec).expect("fail1");
+
+            //try compressing original image
+/*                let img_as_vec = img.clone().into_raw();
+                let mut custom_image : Vec<u8> = Vec::new();//RgbaImage::new(img.width(), img.height());
+
+                let channel_size = img_as_vec.len()/4;
+                for index_in_channel in 0..channel_size
+                {
+                    custom_image.push(img_as_vec[index_in_channel*4 + 0]);
+                    custom_image.push(img_as_vec[index_in_channel*4 + 1]);
+                    custom_image.push(img_as_vec[index_in_channel*4 + 2]);
+                }
+                for index_in_channel in 0..channel_size
+                {
+                    custom_image.push(img_as_vec[index_in_channel*4 + 3]);
+                }
+
+                let original_image_compressed = compress_buffer(&custom_image);
+               // let original_image_size = custom_image.width() * custom_image.height() * 4;
+               // let image_size_percent = original_image_compressed.len() as f64 / original_image_size as f64;
+               // println!("Compression of original image is [{}] bytes [{}%]", original_image_compressed.len(), image_size_percent);
+                //save compressed image file to disk
+               // custom_image.save("first_image.png");
+                std::fs::write("first_image.brotli", original_image_compressed).expect("fail1");
+
+                //save raw image file to disk
+                //std::fs::write("first_image.raw", custom_image.clone().to_vec()).expect("fail2");
+                return;*/
+
+
             if debug_mode { println!("Subtracting image from bottom center of canvas, then cropping image "); }
             let offset_from_bottom_center = offset_to_bottom_center_image(&canvas, &img);
             subtract_image_from_canvas(&mut canvas, &img, offset_from_bottom_center);
+            //canvas.copy_from(img, offset_from_bottom_center.0, offset_from_bottom_center.1);
 
-            let cropped_image_bounds =
+            let (cropped_image_bounds , num_identical_pixels) =
                 crop_function(&canvas, offset_from_bottom_center, img.width(), img.height());
+            let num_pixels_in_image = img.width() * img.height();
+            let similarity = num_identical_pixels as f64 / num_pixels_in_image as f64 * 100.0;
+            println!("Image is {}% similar to previous image", similarity);
 
             let cropped_image =
                 image::imageops::crop(&mut canvas,
                 cropped_image_bounds.x, cropped_image_bounds.y,
                 cropped_image_bounds.width, cropped_image_bounds.height).to_image();
+
+            //try compressing cropped image
+            /*{
+                let diff_image_compressed = compress_image_to_buffer(&cropped_image);
+                let diff_image_size = img.width() * img.height() * 4;
+                let image_size_percent = diff_image_compressed.len() as f64 / diff_image_size as f64;
+                println!("Compression of diff image is [{}] bytes [{}%]", diff_image_compressed.len(), image_size_percent);
+                println!("Diff compression was {}% smaller than naive compression",  diff_image_compressed.len() as f64 / original_image_compressed.len() as f64);
+            }*/
+
 
             //save meta info
             images_meta_info.push(CompressedImageInfo{
@@ -170,7 +233,7 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
             // However subsequent RgbaImage::new assigns a new value to the canvas each iteration
             let cropped_image_as_raw = cropped_image.into_raw();
             save_brotli_image(&mut compressor,
-                              &convert_pixel_based_to_channel_based(cropped_image_as_raw, (cropped_image_bounds.width, cropped_image_bounds.height)),
+                               &convert_pixel_based_to_channel_based(cropped_image_as_raw, (cropped_image_bounds.width, cropped_image_bounds.height)),
                               true);
 
             // Prepare for next iteration by clearing canvas, then copying the 'original' image for the next diff

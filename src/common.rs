@@ -6,7 +6,8 @@ use std::path::Path;
 use std::fs::File;
 use std::fs;
 use std::io::BufReader;
-use std::io::Read;
+use std::io::{Read, Write};
+use brotli;
 
 pub const FILE_FORMAT_HEADER_LENGTH: usize = 8;
 pub const BROTLI_BUFFER_SIZE: usize = 4096; //buffer size used for compression and decompression
@@ -386,4 +387,39 @@ pub fn convert_channel_based_to_pixel_based(channel_based_image : Vec<u8>, dimen
 
 
     return channel_based_image;
+}
+
+pub fn compress_image_to_buffer(img: &image::RgbaImage) -> Vec<u8>
+{
+    let mut retvec = Vec::with_capacity(10000);
+    let imgclone = img.clone();
+    {
+        let mut compressor = brotli::CompressorWriter::new(
+            &mut retvec,
+            BROTLI_BUFFER_SIZE,
+            11,
+            24);
+
+        compressor.write(&imgclone.into_vec()).unwrap();
+    }
+
+    return retvec;
+}
+
+
+pub fn compress_buffer(img: &Vec<u8>) -> Vec<u8>
+{
+    let mut retvec = Vec::with_capacity(10000);
+    let imgclone = img.clone();
+    {
+        let mut compressor = brotli::CompressorWriter::new(
+            &mut retvec,
+            BROTLI_BUFFER_SIZE,
+            11,
+            24);
+
+        compressor.write(&imgclone).unwrap();
+    }
+
+    return retvec;
 }
