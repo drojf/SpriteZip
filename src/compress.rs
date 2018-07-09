@@ -98,15 +98,15 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
 
     let mut image_start_index_in_brotli_stream : usize = 0;
     let mut images_meta_info = Vec::new();
-    let mut f = File::create(brotli_archive_path).expect("Cannot create file");
+    let mut brotli_file = File::create(brotli_archive_path).expect("Cannot create file");
 
     //allocate some space to record how long the brotli compressed data is
-    f.write(&[0; FILE_FORMAT_HEADER_LENGTH]).expect("Unable to allocate header space in file");
+    brotli_file.write(&[0; FILE_FORMAT_HEADER_LENGTH]).expect("Unable to allocate header space in file");
 
     //This set of braces forces the &f mutable reference used in the 'compressor' to go out of scope
     {
         let mut compressor = brotli::CompressorWriter::new(
-        &f,
+        &brotli_file,
         BROTLI_BUFFER_SIZE,
         brotli_quality,
         brotli_window);
@@ -189,7 +189,7 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
     };
 
     //saving meta info
-    let decompression_info_start = f.seek(SeekFrom::Current(0)).unwrap();
+    let decompression_info_start = brotli_file.seek(SeekFrom::Current(0)).unwrap();
     println!("Decompression Info starts at position {}", decompression_info_start);
 
     let serialized : Vec<u8> =  if use_json {
@@ -199,11 +199,11 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
     };
 
     if use_json {
-        f.write(&serialized).expect("Unable to write metadata file");
+        brotli_file.write(&serialized).expect("Unable to write metadata file");
     }
     else {
         let mut compressor = brotli::CompressorWriter::new(
-            &f,
+            &brotli_file,
             BROTLI_BUFFER_SIZE,
             brotli_quality,
             brotli_window);
@@ -212,13 +212,13 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
 
     //save some information about the compression before writing header at start of file
     let uncompressed_metadata_size =  serialized.len();
-    let total_file_size = f.seek(SeekFrom::Current(0)).unwrap();
+    let total_file_size = brotli_file.seek(SeekFrom::Current(0)).unwrap();
     let metadata_length_bytes = total_file_size - decompression_info_start;
     let metadata_as_percentage_of_total = metadata_length_bytes as f64 / total_file_size as f64 * 100.0;
 
     //return to start of file to write header info
-    f.seek(SeekFrom::Start(0)).unwrap();
-    f.write(&u64_to_u8_buf_little_endian(decompression_info_start)).expect("Unable to write header info to file");
+    brotli_file.seek(SeekFrom::Start(0)).unwrap();
+    brotli_file.write(&u64_to_u8_buf_little_endian(decompression_info_start)).expect("Unable to write header info to file");
 
     println!("\n\n ------------ Compression Finished! ------------");
     println!("Total archive size is {}mbytes", total_file_size as f64 / 1e6);
