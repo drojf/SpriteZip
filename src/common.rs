@@ -4,6 +4,7 @@ use walkdir::WalkDir;
 use std;
 use std::path::Path;
 use std::fs::File;
+use std::fs;
 use std::io::BufReader;
 use std::io::Read;
 
@@ -251,6 +252,7 @@ pub fn save_image_no_alpha(mut image : RgbaImage, save_path : &str)
     }
 
     let save_path = Path::new("debug_images").join(save_path);
+    fs::create_dir_all(save_path.parent().unwrap()).unwrap();
     println!("Will save image to: {}", save_path.to_str().unwrap());
     image.save(save_path).unwrap()
 }
@@ -262,7 +264,6 @@ pub fn convert_pixel_based_to_channel_based(pixel_based_image : Vec<u8>, dimensi
     if true
     {
         let mut channel_based_image = Vec::with_capacity(pixel_based_image.len());
-        println!("Block compression");
         let target_block_size = 50;
         let x_num_normal_blocks = dimensions.0 / target_block_size + 1; //always do one extra, even if not needed (for now)
         let y_num_normal_blocks = dimensions.1 / target_block_size + 1; //always do one extra, even if not needed (for now)
@@ -292,8 +293,6 @@ pub fn convert_pixel_based_to_channel_based(pixel_based_image : Vec<u8>, dimensi
                 }
             }
         }
-
-        println!("compression legnth is {}", channel_based_image.len());
         return channel_based_image;
     }
     else if false
@@ -331,8 +330,6 @@ pub fn convert_channel_based_to_pixel_based(channel_based_image : Vec<u8>, dimen
     if true
     {
         let mut pixel_based_image = vec![0; channel_based_image.len()];
-
-        println!("Block Compression");
         let target_block_size = 50;
         let x_num_normal_blocks = dimensions.0 / target_block_size + 1; //always do one extra, even if not needed (for now)
         let y_num_normal_blocks = dimensions.1 / target_block_size + 1; //always do one extra, even if not needed (for now)

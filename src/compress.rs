@@ -70,13 +70,14 @@ fn crop_function(img: &image::RgbaImage, offset : (u32, u32), max_width : u32, m
 /// Saves a raw canvas image using an external compressor
 /// compressor: the compressor to use to save the image
 /// canvas_as_raw: the raw image to be saved using the compressor
-fn save_brotli_image<T>(compressor : &mut brotli::CompressorWriter<T>, canvas_as_raw : &Vec<u8>, print_execution_time : bool)
+fn save_brotli_image<T>(compressor : &mut brotli::CompressorWriter<T>, canvas_as_raw : &Vec<u8>, print_execution_time : bool) -> usize
 where T: std::io::Write
 {
     let brotli_start = time::PreciseTime::now();
-    compressor.write(canvas_as_raw).unwrap();
+    let bytes_written = compressor.write(canvas_as_raw).unwrap();
     let brotli_end = time::PreciseTime::now();
     if print_execution_time { println!("Brotli compression took {} seconds", brotli_start.to(brotli_end)); }
+    return bytes_written;
 }
 
 /// File format is as follows:
@@ -162,7 +163,7 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
             println!("Image size is {},  width is {} height is {}", cropped_image.len(), cropped_image_bounds.width, cropped_image_bounds.height);
 
             //save diff image as png for debugging reasons
-            if debug_mode { save_image_no_alpha(cropped_image.clone(), path_relative_to_input_folder); }
+            if debug_mode { save_image_no_alpha(cropped_image.clone(), &path_relative_to_input_folder); }
 
             // Compress the the diff image (or 'normal' image for first image)
             // NOTE: the below 'into_raw()' causes a move, so the canvas cannot be used anymore
