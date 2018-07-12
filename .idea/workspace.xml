@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="8002edc4-ab8e-4d24-8d89-9db458a38d32" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/compress.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/compress.rs" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -17,7 +16,7 @@
       <file leaf-file-name="main.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/main.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="267">
+            <state relative-caret-position="1037">
               <caret line="61" column="8" selection-start-line="61" selection-start-column="8" selection-end-line="61" selection-end-column="8" />
             </state>
           </provider>
@@ -26,8 +25,8 @@
       <file leaf-file-name="compress.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/compress.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="539">
-              <caret line="351" column="78" lean-forward="true" selection-start-line="351" selection-start-column="78" selection-end-line="351" selection-end-column="78" />
+            <state relative-caret-position="628">
+              <caret line="315" column="8" selection-start-line="315" selection-start-column="8" selection-end-line="315" selection-end-column="8" />
             </state>
           </provider>
         </entry>
@@ -35,7 +34,7 @@
       <file leaf-file-name="DoubleImageIterator.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/DoubleImageIterator.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="709">
+            <state relative-caret-position="2941">
               <caret line="173" column="9" selection-start-line="173" selection-start-column="9" selection-end-line="173" selection-end-column="82" />
             </state>
           </provider>
@@ -53,8 +52,8 @@
       <file leaf-file-name="common.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/common.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4335">
-              <caret line="261" column="1" selection-start-line="261" selection-start-column="1" selection-end-line="261" selection-end-column="1" />
+            <state relative-caret-position="340">
+              <caret line="20" selection-start-line="20" selection-end-line="20" selection-end-column="40" />
             </state>
           </provider>
         </entry>
@@ -79,7 +78,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>pause</find>
       <find>alpha</find>
       <find>read_to_en</find>
       <find>pixel</find>
@@ -109,6 +107,7 @@
       <find>blocK_widthB</find>
       <find>::new(</find>
       <find>diffe</find>
+      <find>cropregion</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -230,7 +229,6 @@
       <window_info anchor="bottom" id="TODO" order="9" />
       <window_info anchor="right" id="Cargo" order="0" />
       <window_info anchor="bottom" id="Event Log" order="2" side_tool="true" />
-      <window_info anchor="bottom" id="Find" order="5" weight="0.32946146" />
       <window_info anchor="bottom" id="Version Control" order="3" />
       <window_info anchor="bottom" id="Python Console" order="0" />
       <window_info anchor="bottom" x="1184" y="457" width="1920" height="301" id="Run" order="10" weight="0.11361868" />
@@ -244,6 +242,7 @@
       <window_info anchor="right" id="Ant Build" order="2" weight="0.25" />
       <window_info anchor="bottom" id="Message" order="4" />
       <window_info anchor="bottom" id="Cvs" order="7" weight="0.25" />
+      <window_info anchor="bottom" id="Find" order="5" weight="0.32946146" />
     </layout>
   </component>
   <component name="VcsContentAnnotationSettings">
@@ -552,13 +551,6 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/byte_counter.rs" />
-    <entry file="file://$PROJECT_DIR$/src/common.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4335">
-          <caret line="261" column="1" selection-start-line="261" selection-start-column="1" selection-end-line="261" selection-end-column="1" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/dump.txt">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="612">
@@ -568,22 +560,29 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="267">
+        <state relative-caret-position="1037">
           <caret line="61" column="8" selection-start-line="61" selection-start-column="8" selection-end-line="61" selection-end-column="8" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/DoubleImageIterator.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="709">
+        <state relative-caret-position="2941">
           <caret line="173" column="9" selection-start-line="173" selection-start-column="9" selection-end-line="173" selection-end-column="82" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/common.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="340">
+          <caret line="20" selection-start-line="20" selection-end-line="20" selection-end-column="40" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/compress.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="539">
-          <caret line="351" column="78" lean-forward="true" selection-start-line="351" selection-start-column="78" selection-end-line="351" selection-end-column="78" />
+        <state relative-caret-position="628">
+          <caret line="315" column="8" selection-start-line="315" selection-start-column="8" selection-end-line="315" selection-end-column="8" />
         </state>
       </provider>
     </entry>
