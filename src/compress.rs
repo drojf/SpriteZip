@@ -81,6 +81,61 @@ fn crop_function(img: &image::RgbaImage, offset : (u32, u32), max_width : u32, m
     num_identical_pixels)
 }
 
+struct Cropper {
+    min_x: u32,
+    max_x: u32,
+    min_y: u32,
+    max_y: u32,
+}
+
+#[derive(Debug)]
+pub struct CropRegion {
+    top_left : (u32, u32),
+    dimensions : (u32, u32),
+}
+
+impl Cropper {
+
+    fn new(image_dimensions : (u32, u32)) -> Cropper {
+        Cropper {
+            //set each bound to its worst case value
+            min_x: image_dimensions.0,
+            max_x: 0,
+            min_y: image_dimensions.1,
+            max_y: 0,
+        }
+    }
+
+    fn add_nonzero_pixel(&mut self, x : u32, y : u32)
+    {
+        //reduce each bound
+        self.min_x = std::cmp::min(self.min_x, x);
+        self.max_x = std::cmp::max(self.max_x, x);
+
+        self.min_y = std::cmp::min(self.min_y, y);
+        self.max_y = std::cmp::max(self.max_y, y);
+    }
+
+    //not sure whether to return None or a zero size crop region here
+    //I guess a zero size crop region is more generic, so I'll do that
+    fn get_crop_region(&self) -> CropRegion
+    {
+        //if the min x is greater than the max x, it means the image is empty (no pixels ever recorded)
+        if self.min_x > self.max_x {
+            CropRegion {
+                top_left : (0,0),
+                dimensions : (0,0),
+            }
+        }
+        else {
+            CropRegion {
+                top_left : (self.min_x, self.min_y),
+                dimensions : ((self.max_x - self.min_x + 1),(self.max_y - self.min_y + 1))
+            }
+        }
+    }
+}
+
 fn measure_similarity(img1: &image::RgbaImage, img2: &image::RgbaImage)
 {
     //initialize canvas to place the two images on
@@ -229,51 +284,50 @@ pub fn alt_compression_2(brotli_archive_path : &str)
     let mut base_images : Vec<RgbaImage> = Vec::new();
     let mut relative_paths : Vec<String> = Vec::new();
 
-    //add compressor here
+    //Create compressors for image data and bitmap
     let brotli_quality = 11;
     let brotli_window = 24;
     let brotli_file = File::create("alt_image.brotli").expect("Cannot create file");
     let mut image_compressor = brotli::CompressorWriter::new(brotli_file,BROTLI_BUFFER_SIZE,brotli_quality,brotli_window);
-
     let brotli_file_2 = File::create("alt_diff.brotli").expect("Cannot create file");
+    let mut bitmap_compressor = brotli::CompressorWriter::new(brotli_file_2, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window);
+
+    for entry in WalkDir::new("input_images")
     {
-        let mut bitmap_compressor = brotli::CompressorWriter::new(brotli_file_2, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window);
-
-        for entry in WalkDir::new("input_images")
-            {
-                let ent = entry.unwrap();
-                if ent.file_type().is_dir() {
-                    continue;
-                }
-
-                let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
-                relative_paths.push(String::from(path_relative_to_input_folder));
-
-                let img_dyn = image::open(ent.path()).unwrap();
-                let img = img_dyn.as_rgba8().unwrap();
-                base_images.push(img.clone());
-
-                println!("Image Path: {}", path_relative_to_input_folder);
-            }
-
-        for i in 0..base_images.len() - 1 {
-            let img1 = &base_images[i];
-            let img2 = &base_images[i + 1];
-
-            let overlap_info = calculate_overlapping_regions_when_bottom_centered(img1, img2);
-            println!("img1 is ({:?}), img2 is ({:?})", img1.dimensions(), img2.dimensions());
-            println!("{:?}", overlap_info);
-            let mut debug_image = RgbaImage::new(overlap_info.overlap.0, overlap_info.overlap.1);
-
-            alt_compression_3_inner(img1, img2, &mut image_compressor, &mut bitmap_compressor);
+        let ent = entry.unwrap();
+        if ent.file_type().is_dir() {
+            continue;
         }
+
+        let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
+        relative_paths.push(String::from(path_relative_to_input_folder));
+
+        let img_dyn = image::open(ent.path()).unwrap();
+        let img = img_dyn.as_rgba8().unwrap();
+        base_images.push(img.clone());
+
+        println!("Image Path: {}", path_relative_to_input_folder);
+    }
+
+    for i in 0..base_images.len() - 1 {
+        let img1 = &base_images[i];
+        let img2 = &base_images[i + 1];
+
+        let overlap_info = calculate_overlapping_regions_when_bottom_centered(img1, img2);
+        println!("img1 is ({:?}), img2 is ({:?})", img1.dimensions(), img2.dimensions());
+        println!("{:?}", overlap_info);
+        let mut debug_image = RgbaImage::new(overlap_info.overlap.0, overlap_info.overlap.1);
+
+        alt_compression_3_inner(img1, img2, &mut image_compressor, &mut bitmap_compressor);
     }
 
 }
 
-pub fn alt_compression_3_inner<'s,T>(original_image : &image::RgbaImage, prev_image : &image::RgbaImage, image_compressor : &'s mut brotli::CompressorWriter<T>, bitmap_compressor : &'s mut   brotli::CompressorWriter<T>)
+pub fn alt_compression_3_inner<'s,T>(original_image : &image::RgbaImage, prev_image : &image::RgbaImage, image_compressor : &'s mut brotli::CompressorWriter<T>, bitmap_compressor : &'s mut   brotli::CompressorWriter<T>) -> CropRegion
 where T: std::io::Write
 {
+    let mut cropper = Cropper::new((original_image.width(), original_image.height()));
+
     let (x_offset_to_other_image, y_offset_to_other_image) = get_offset_to_other_image(original_image, prev_image);
 
     let mut difference : Vec<u8> = Vec::with_capacity(original_image.width() as usize * original_image.height() as usize);
@@ -295,18 +349,24 @@ where T: std::io::Write
         else {
             difference.push(1u8);
             image_compressor.write(&original_image_pixel.data);
-            //TODO: update cropper
-            //cropper.update(x,y);
+            cropper.add_nonzero_pixel(x,y);
         }
     }
 
     //crop the difference map
-    //TODO: crop difference map
-    //difference_map = difference_map.crop(copper.values)
-    bitmap_compressor.write(&difference);
+    let crop_region = cropper.get_crop_region();
+    println!("Crop region is {:?}", crop_region);
+    let mut difference_cropped = Vec::with_capacity(crop_region.dimensions.0 as usize * crop_region.dimensions.1 as usize);
+    for y in 0..crop_region.dimensions.1 as usize {
+        for x in 0..crop_region.dimensions.0 as usize {
+            difference_cropped.push(difference[x + y * original_image.width() as usize]);
+        }
+    }
 
-    //TODO: return crop region
-    //return crop_region //need to record metadata on which area of the image was cropped.
+    bitmap_compressor.write(&difference_cropped);
+
+    //return crop_region to be saved as metadata
+    return crop_region
 }
 
 pub fn alt_compression_2_inner<'s,T>(original_image : &image::RgbaImage, prev_image : &image::RgbaImage, image_compressor : &'s mut brotli::CompressorWriter<T>, bitmap_compressor : &'s mut   brotli::CompressorWriter<T>)
