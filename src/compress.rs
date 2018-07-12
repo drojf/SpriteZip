@@ -81,6 +81,393 @@ fn crop_function(img: &image::RgbaImage, offset : (u32, u32), max_width : u32, m
     num_identical_pixels)
 }
 
+fn measure_similarity(img1: &image::RgbaImage, img2: &image::RgbaImage)
+{
+    //initialize canvas to place the two images on
+    let max_width = std::cmp::max(img1.width(), img2.width());
+    let max_height = std::cmp::max(img1.height(), img2.height());
+    let mut canvas = RgbaImage::new(max_width, max_height);
+
+    //place first image on the canvas
+    let (img1_x_offset, img1_y_offset) = offset_to_bottom_center_image(&canvas, &img1);
+    canvas.copy_from(img1, img1_x_offset, img1_y_offset);
+
+    //subtract second image from the canvas
+    let img2_offset_from_bottom_center = offset_to_bottom_center_image(&canvas, &img2);
+    subtract_image_from_canvas(&mut canvas, &img2, img2_offset_from_bottom_center);
+
+    //count number of non-identical pixels which have non-zero alpha values
+    let mut num_identical_pixels = 0;
+    let mut num_different_pixels = 0;
+    for (x, y, pixel_ref) in canvas.enumerate_pixels()
+    {
+        let pixel = *pixel_ref;
+
+        //skip alpha = 0 pixels
+        if pixel[3] == 0 { continue; }
+
+        if pixel == image::Rgba([0u8; 4])
+        {
+            num_identical_pixels += 1;
+        }
+        else
+        {
+            num_different_pixels += 1;
+        }
+    }
+
+    println!("Identical Pixels {} Different Pixels {}", num_identical_pixels, num_different_pixels);
+
+
+    /*
+    //calculate how much to offset such that is centered on canvas
+    let img1_x_offset = max_width - img1.width()/2;
+    let img2_x_offset = max_width - img2.width()/2;
+    let
+
+    //calculate how much to offset so that image is placed at bottom of image
+    let img1_y_offset = max_height - img1.height();
+    let img2_y_offset = max_height - img2.height();*/
+
+}
+
+pub fn get_offset_to_other_image(original_image : &image::RgbaImage, prev_image : &image::RgbaImage) -> (i64, i64)
+{
+    let prev_x_offset = (prev_image.width() as i64 - original_image.width()  as i64)/2;
+    let prev_y_offset = prev_image.height() as i64 - original_image.height() as i64;
+    (prev_x_offset, prev_y_offset)
+}
+
+pub fn try_get_pixel(prev_xy : (u32, u32), prev_image : &image::RgbaImage) -> Option<image::Rgba<u8>>
+{
+    let prev_x = prev_xy.0; //original_pixel_xy.0 + prev_x_offset;
+    let prev_y = prev_xy.1; //original_pixel_xy.1 + prev_y_offset;
+
+    if prev_x < 0 || prev_y < 0 || prev_x >= prev_image.width() || prev_y >= prev_image.height() {
+        return None;
+    }
+
+    return Some(*prev_image.get_pixel(prev_x, prev_y));
+}
+
+pub fn alt_compression_2(brotli_archive_path : &str)
+{
+    let mut base_images : Vec<RgbaImage> = Vec::new();
+    let mut relative_paths : Vec<String> = Vec::new();
+
+    //add compressor here
+    let brotli_quality = 11;
+    let brotli_window = 24;
+    let brotli_file = File::create("alt_image.brotli").expect("Cannot create file");
+    let mut image_compressor = brotli::CompressorWriter::new(brotli_file,BROTLI_BUFFER_SIZE,brotli_quality,brotli_window);
+
+    let brotli_file_2 = File::create("alt_diff.brotli").expect("Cannot create file");
+    {
+        let mut bitmap_compressor = brotli::CompressorWriter::new(brotli_file_2, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window);
+
+        for entry in WalkDir::new("input_images")
+            {
+                let ent = entry.unwrap();
+                if ent.file_type().is_dir() {
+                    continue;
+                }
+
+                let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
+                relative_paths.push(String::from(path_relative_to_input_folder));
+
+                let img_dyn = image::open(ent.path()).unwrap();
+                let img = img_dyn.as_rgba8().unwrap();
+                base_images.push(img.clone());
+
+                println!("Image Path: {}", path_relative_to_input_folder);
+            }
+
+        for i in 0..base_images.len() - 1 {
+            let img1 = &base_images[i];
+            let img2 = &base_images[i + 1];
+
+            let overlap_info = calculate_overlapping_regions_when_bottom_centered(img1, img2);
+            println!("img1 is ({:?}), img2 is ({:?})", img1.dimensions(), img2.dimensions());
+            println!("{:?}", overlap_info);
+            let mut debug_image = RgbaImage::new(overlap_info.overlap.0, overlap_info.overlap.1);
+
+            alt_compression_2_inner(img1, img2, &mut image_compressor, &mut bitmap_compressor);
+        }
+    }
+
+}
+
+
+
+pub fn alt_compression_2_inner<'s,T>(original_image : &image::RgbaImage, prev_image : &image::RgbaImage, image_compressor : &'s mut brotli::CompressorWriter<T>, bitmap_compressor : &'s mut   brotli::CompressorWriter<T>)
+where T: std::io::Write
+{
+    let (x_offset_to_other_image, y_offset_to_other_image) = get_offset_to_other_image(original_image, prev_image);
+
+    //TODO: crop difference image
+    //let cropper = Cropper::new();
+
+    let b = 50;
+    let image_width = original_image.width();
+    let image_height = original_image.height();
+
+    let x_num_blocks = original_image.width()  / b + if original_image.width()  % b != 0 {1} else {0};
+    let y_num_blocks = original_image.height() / b + if original_image.height() % b != 0 {1} else {0};
+
+    let mut difference : Vec<u8> = Vec::with_capacity(original_image.width() as usize * original_image.height() as usize);
+
+    for y_block_i in 0..y_num_blocks {
+        for x_block_i in 0..x_num_blocks {
+
+            let block_height = std::cmp::min(b, original_image.height() - b * y_block_i);
+            for block_y_pixel in 0..block_height{
+
+                let block_width = std::cmp::min(b, original_image.width() - b * x_block_i);
+                for block_x_pixel in 0..block_width {
+
+                    let x = block_x_pixel + x_block_i * b;
+                    let y = block_y_pixel + y_block_i * b;
+                    let original_image_pixel = *original_image.get_pixel(x, y);
+                    let prev_x = (x as i64 + x_offset_to_other_image) as u32;
+                    let prev_y = (y as i64 + y_offset_to_other_image) as u32;
+
+                    //check if out of range of other image. If not out of range, check equality
+                    //let pixels_equal = ;
+                        //x_ref < ref_image_width  &&
+                        //y_ref < ref_image_y  &&
+                        //original_image_pixel == *prev_imag.get_pixel(x + ref_offset_x, y + ref_offset.y);;
+
+                    let pixels_equal = match try_get_pixel((prev_x, prev_y), &prev_image) {
+                        None => false,
+                        Some(prev_pixel) => original_image_pixel == prev_pixel,
+                    };
+
+                    if pixels_equal {
+                        difference.push(0u8);
+                    }
+                    else {
+                        difference.push(1u8);
+                        image_compressor.write(&original_image_pixel.data);
+                        //TODO: update cropper
+                        //cropper.update(x,y);
+                    }
+                }
+            }
+        }
+    }
+
+    //crop the difference map
+    //TODO: crop difference map
+    //difference_map = difference_map.crop(copper.values)
+    bitmap_compressor.write(&difference);
+
+    //TODO: return crop region
+    //return crop_region //need to record metadata on which area of the image was cropped.
+
+
+//iteration order should be blockwise, optionally pixels should be scanned in snake order/blocks
+//also scanned in snake order.
+
+//before first iteration,
+// - init compressor object
+// - set prev_image = black image the same size as first image
+
+//for each image
+    //init crop object with image width/height
+
+    //for each x,y, pixel in image (iteration order should be optimized later)
+        //pixels_are_identical ->
+            //if x,y is out of range of prevImage ret NOT_EQUAL
+            //ret [prev_image == image] (at the corresponding location, not just x,y)
+
+        //if pixels are identical
+            //difference_map[x,y] = 0
+        //if pixels are not identical
+            //difference_map[x,y] = 1
+            //compressor.add(image[x,y])
+            //update crop bounds
+
+    //crop the difference map
+    //compress the difference map
+
+    //prev_image = image
+}
+
+#[derive(Debug)]
+pub struct ImageOverlapInfo {
+    pub overlap : (u32, u32),
+    pub img1_offset : (u32, u32),
+    pub img2_offset : (u32, u32),
+}
+
+fn calculate_overlapping_regions_when_bottom_centered(img1: &image::RgbaImage, img2: &image::RgbaImage) -> ImageOverlapInfo
+{
+    //calculate how much the two images overlap
+    let x_overlap = std::cmp::min(img1.width(), img2.width());
+    let y_overlap = std::cmp::min(img1.height(), img2.height());
+
+    //start iterating so that you iterate over the center of each image
+    let img1_x_start = (img1.width() - x_overlap)/2;
+    let img2_x_start = (img2.width() - x_overlap)/2;
+
+    //start iterating so that you take the bottom-most section of the image
+    let img1_y_start = img1.height() - y_overlap;
+    let img2_y_start = img2.height() - y_overlap;
+
+    ImageOverlapInfo {
+        overlap : (x_overlap, y_overlap),
+        img1_offset : (img1_x_start, img1_y_start),
+        img2_offset : (img2_x_start, img2_y_start),
+    }
+}
+
+pub fn block_compression_test(brotli_archive_path : &str)
+{
+    let mut base_images : Vec<RgbaImage> = Vec::new();
+    let mut relative_paths : Vec<String> = Vec::new();
+
+    //add compressor here
+    let brotli_quality = 11;
+    let brotli_window = 24;
+    let mut brotli_file = File::create("alt_image.brotli").expect("Cannot create file");
+    let mut compressor = brotli::CompressorWriter::new(
+    &brotli_file,
+    BROTLI_BUFFER_SIZE,
+    brotli_quality,
+    brotli_window);
+
+    for entry in WalkDir::new("input_images")
+    {
+        let ent = entry.unwrap();
+        if ent.file_type().is_dir() {
+            continue;
+        }
+
+        let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
+        relative_paths.push(String::from(path_relative_to_input_folder));
+
+        let img_dyn = image::open(ent.path()).unwrap();
+        let img = img_dyn.as_rgba8().unwrap();
+        base_images.push(img.clone());
+
+        println!("Image Path: {}", path_relative_to_input_folder);
+    }
+
+    for i in 0..base_images.len()-1 {
+        let img1 = &base_images[i];
+        let img2 = &base_images[i+1];
+
+        let overlap_info = calculate_overlapping_regions_when_bottom_centered(img1, img2);
+        println!("img1 is ({:?}), img2 is ({:?})", img1.dimensions(), img2.dimensions());
+        println!("{:?}", overlap_info);
+        let mut debug_image = RgbaImage::new(overlap_info.overlap.0, overlap_info.overlap.1);
+
+        //do test on compression ratio
+
+
+        //do a test on compression ratio of bitmapped image?
+        let mut bitmap = vec![0u8;overlap_info.overlap.0 as usize * overlap_info.overlap.1 as usize];
+
+        //for comparison, just compress overlapping region
+
+        //iterate over overlapping section, giving count of different pixels in each grid square
+        let block_size = 25;
+        let x_num_blocks = overlap_info.overlap.0 / block_size + 1; //always do one extra, even if not needed (for now)
+        let y_num_blocks = overlap_info.overlap.1 / block_size + 1; //always do one extra, even if not needed (for now)
+
+        for y_block_i in 0..y_num_blocks {
+            for x_block_i in 0..x_num_blocks {
+                //iterate within each block
+                let mut different_pixel_count = 0;
+                for block_y_pixel in 0..block_size {
+                    for block_x_pixel in 0..block_size {
+                        let both_offset_x = x_block_i * block_size + block_x_pixel;
+                        let both_offset_y = y_block_i * block_size + block_y_pixel;
+
+                        if both_offset_x >= overlap_info.overlap.0 || both_offset_y >= overlap_info.overlap.1 {
+                            continue
+                        }
+
+                        //compare pixels
+                        let image_1_pixel = img1.get_pixel(both_offset_x + overlap_info.img1_offset.0, both_offset_y + overlap_info.img1_offset.1);
+                        let image_2_pixel = img2.get_pixel(both_offset_x + overlap_info.img2_offset.0, both_offset_y + overlap_info.img2_offset.1);
+
+                        if *image_1_pixel != *image_2_pixel {
+                            different_pixel_count += 1;
+                            debug_image.put_pixel(both_offset_x, both_offset_y,image::Rgba( [255,255,255, 255] ));
+                            compressor.write(&image_2_pixel.data).unwrap();
+                            bitmap[(both_offset_x + both_offset_y * overlap_info.overlap.0) as usize] = 1;
+                        }
+                        else {
+                            debug_image.put_pixel(both_offset_x, both_offset_y, *image_1_pixel );
+                        }
+                    }
+                }
+
+                for block_y_pixel in 0..block_size {
+                    for block_x_pixel in 0..block_size {
+                        let both_offset_x = x_block_i * block_size + block_x_pixel;
+                        let both_offset_y = y_block_i * block_size + block_y_pixel;
+                        if both_offset_x >= overlap_info.overlap.0 || both_offset_y >= overlap_info.overlap.1 {
+                            continue
+                        }
+                        let image_1_pixel = *img1.get_pixel(both_offset_x + overlap_info.img1_offset.0, both_offset_y + overlap_info.img1_offset.1);
+                        let image_2_pixel = *img2.get_pixel(both_offset_x + overlap_info.img2_offset.0, both_offset_y + overlap_info.img2_offset.1);
+
+                        /*debug_image.put_pixel(both_offset_x, both_offset_y,
+                           if different_pixel_count != 0 {
+                                compressor.write(&image_2_pixel.data).unwrap();
+                                                              image::Rgba( [image_1_pixel[0]/2 + image_2_pixel[0]/2,
+                                   image_1_pixel[1]/2 + image_2_pixel[1]/2,
+                                   image_1_pixel[2]/2 + image_2_pixel[2]/2, 255] )
+
+                                }
+                           else {
+
+                               image_1_pixel
+                           }
+                        );*/
+                    }
+                }
+
+                //compress only changed blocks
+
+                println!("Block ({},{}) has {} diff pix", x_block_i, y_block_i, different_pixel_count);
+            }
+        }
+        let mut bitmap_bits: Vec<u8> = Vec::new();
+
+        for byte_i in 0..bitmap.len()/8
+        {
+            let mut current_byte = 0;
+            for bit_i in 0..8
+            {
+                current_byte |= (bitmap[byte_i * 8 + bit_i] << bit_i)
+            }
+            bitmap_bits.push(current_byte);
+        }
+
+        let mut bitmap_compressed: Vec<u8> = Vec::new();
+        let brotli_quality = 11;
+        let brotli_window = 24;
+        {
+            let mut compressor2 = brotli::CompressorWriter::new(
+                &mut bitmap_compressed,
+                BROTLI_BUFFER_SIZE,
+                brotli_quality,
+                brotli_window);
+
+            //compressor2.write(&bitmap);
+            compressor2.write(&bitmap_bits);
+        }
+        println!("Vector size is {}, compressed size is {}", bitmap.len(), bitmap_compressed.len());
+
+        let save_path = std::path::Path::new("debug_images").join(&relative_paths[i]);
+        std::fs::create_dir_all(save_path.parent().unwrap()).unwrap();
+        debug_image.save(save_path);
+    }
+}
+
 /// Saves a raw canvas image using an external compressor
 /// compressor: the compressor to use to save the image
 /// canvas_as_raw: the raw image to be saved using the compressor
@@ -92,6 +479,122 @@ where T: std::io::Write
     let brotli_end = time::PreciseTime::now();
     if print_execution_time { println!("Brotli compression took {} seconds", brotli_start.to(brotli_end)); }
     return bytes_written;
+}
+
+//assume square block
+//block offset - offset in blocks (NOT in pixels) to check for match
+//returns number of non-matching pixels in block
+//if 0 then do block copy
+//if < threshold then do block subtract
+//if > threshold then just do raw data
+fn get_different_pixels_in_block(img1: &image::RgbaImage, img2: &image::RgbaImage, block_offset : (u32, u32), block_size : u32) //-> u64
+{
+    let start_x = block_offset.0 * block_size;
+    let start_y = block_offset.1 * block_size;
+
+    //note: end_x/y is the bound of the for loop, NOT the last index iterated by the for loop
+    //let end_x = std::cmp::min(start_x + block_size, img)
+}
+
+pub fn alt_compression(brotli_archive_path : &str)
+{
+    let (max_width, max_height) = scan_folder_for_max_png_size("input_images");
+    let canvas_width  = (max_width + 1)  & !0x1;
+    let canvas_height = (max_height + 1) & !0x1;
+    println!("max image size: ({},{})\nchosen canvas size: ({},{})", max_width, max_height, canvas_width, canvas_height);
+
+    let mut base_images : Vec<RgbaImage> = Vec::new();
+    let mut relative_paths : Vec<String> = Vec::new();
+
+    let mut count = 0;
+    for entry in WalkDir::new("input_images")
+    {
+        let mut canvas = RgbaImage::new(canvas_width, canvas_height);
+        let ent = entry.unwrap();
+        if ent.file_type().is_dir() {
+            continue;
+        }
+
+        let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
+
+        relative_paths.push(String::from(path_relative_to_input_folder));
+
+        let img_dyn = image::open(ent.path()).unwrap();
+        let img = img_dyn.as_rgba8().unwrap();
+
+        let offset_from_bottom_center = offset_to_bottom_center_image(&canvas, &img);
+        canvas.copy_from(img, offset_from_bottom_center.0, offset_from_bottom_center.1);
+
+
+        base_images.push(canvas);
+
+        println!("Image Path: {}", path_relative_to_input_folder);
+    }
+
+    //add compressor here
+    let brotli_quality = 11;
+    let brotli_window = 24;
+    let mut brotli_file = File::create("alt_image.brotli").expect("Cannot create file");
+    let mut compressor = brotli::CompressorWriter::new(
+    &brotli_file,
+    BROTLI_BUFFER_SIZE,
+    brotli_quality,
+    brotli_window);
+
+   /* for x in 0..canvas_width{
+        println!("processing column {}", x);
+        for y in 0..canvas_height{
+            for i in 0..base_images.len()
+            {
+                let image = &base_images[i];
+                let pixel_to_compress = image.get_pixel(x,y);
+                //println!("w{:?}", pixel_to_compress);
+                compressor.write(&pixel_to_compress.data).unwrap();
+            }
+        }
+    }*/
+    let target_block_size = 50;
+    let x_num_normal_blocks = canvas_width / target_block_size + 1; //always do one extra, even if not needed (for now)
+    let y_num_normal_blocks = canvas_height / target_block_size + 1; //always do one extra, even if not needed (for now)
+
+    for i in 0..base_images.len() {
+        let image = &base_images[i];
+        for y_block_i in 0..y_num_normal_blocks
+        {
+            for x_block_i in 0..x_num_normal_blocks
+            {
+                for block_y_pixel_ind in 0..target_block_size {
+                    for block_x_pixel_ind in 0..target_block_size {
+                        let y_index = y_block_i * target_block_size + block_y_pixel_ind;
+                        let x_index = x_block_i * target_block_size + block_x_pixel_ind;
+
+                        //check in range
+                        if x_index >= image.width() || y_index >= image.height() {
+                            continue
+                        }
+
+                        let pixel_to_compress = image.get_pixel(x_index,y_index);
+                        compressor.write(&pixel_to_compress.data).unwrap();
+                    }
+                }
+            }
+        }
+    }
+
+    /*let mut count = 0;
+    for image in base_images
+    {
+        let save_path = std::path::Path::new("debug_images").join(&relative_paths[count]);
+        std::fs::create_dir_all(save_path.parent().unwrap()).unwrap();
+
+        image.save(save_path);
+
+        compressor.write(&image.into_raw()).unwrap();
+        count += 1;
+    }*/
+
+
+
 }
 
 /// File format is as follows:
@@ -197,9 +700,9 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
 
             let cropped_image =
                 image::imageops::crop(&mut canvas,
-                cropped_image_bounds.x, cropped_image_bounds.y,
+                cropped_image_bounds.x, cropped_image_bounds.y, //0,0,//
                 cropped_image_bounds.width, cropped_image_bounds.height).to_image();
-
+                //canvas_width, canvas_height).to_image();
             //try compressing cropped image
             /*{
                 let diff_image_compressed = compress_image_to_buffer(&cropped_image);

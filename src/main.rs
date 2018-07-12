@@ -29,7 +29,7 @@ extern crate time;
 
 //custom modules
 use alphablend::convert_folder_to_alphablend;
-use compress::compress_path;
+use compress::{compress_path, block_compression_test,alt_compression, alt_compression_2};
 use extract::extract_archive;
 use common::verify_images;
 
@@ -59,7 +59,10 @@ fn main()
     if do_brotli_compression
     {
         println!("\n\n ---------- Begin Compression... ---------- ");
-        compress_path(&brotli_archive_path, false, false);
+        alt_compression_2(&brotli_archive_path);
+        //block_compression_test(&brotli_archive_path);
+        //alt_compression(&brotli_archive_path);
+        //compress_path(&brotli_archive_path, false, false);
     }
 
     if do_brotli_extract
