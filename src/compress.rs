@@ -131,6 +131,80 @@ fn measure_similarity(img1: &image::RgbaImage, img2: &image::RgbaImage)
 
 }
 
+
+struct BlockImageIterator<'s> {
+    original_image : &'s image::RgbaImage,
+    block_size : usize,
+    i : usize,
+}
+
+impl<'s> BlockImageIterator<'s> {
+    fn new(original_image : &'s image::RgbaImage, block_size : usize) -> BlockImageIterator<'s>
+    {
+        //let block_size = 50;
+        //let num_x_blocks = original_image.width()/block_size  + if original_image.width()  % block_size == 0 { 0 } else { 1 };
+        //let num_y_blocks = original_image.height()/block_size + if original_image.height() % block_size == 0 { 0 } else { 1 };
+
+        BlockImageIterator {
+            original_image,
+            block_size,
+            i : 0,
+        }
+    }
+}
+
+impl<'s> Iterator for BlockImageIterator<'s>  {
+type Item = (u32, u32, image::Rgba < u8 >);
+
+	//use this one?
+	fn next(&mut self) -> Option<Self::Item>
+    {
+        let debug = false;
+
+		let B = self.block_size;
+        let i = self.i;
+        let width = self.original_image.width() as usize;
+        let height = self.original_image.height() as usize;
+		let pixels_per_block_row = B * width;
+
+        if debug { println!("i:{}", i); }
+
+		let block_y = i / pixels_per_block_row;
+		let pixels_in_previous_block_rows = block_y * pixels_per_block_row;
+		let block_height =  std::cmp::min(B, height - B * block_y);
+        if debug  { println!("block_y {} block_height {}", block_y, block_height); }
+
+		//for all rows except the last row, block_height == B.
+		//for last row, block_height = image.height() % B
+		let pixels_in_current_block_row = i - pixels_in_previous_block_rows;
+		let block_x = pixels_in_current_block_row / (B * block_height);
+        let block_width  = std::cmp::min(B, width - B * block_x);
+        if debug { println!("pixels_in_block_row  {} block_x {} block_width {}", pixels_in_current_block_row , block_x, block_width); }
+
+		//for the very last block, both block height and block width will != B
+		let i_in_block = pixels_in_current_block_row - block_x * (B * block_height);
+        if debug { println!("i_in_block {}", i_in_block); }
+
+		let x = (i_in_block % block_width + block_x * B) as u32;
+        let y = (i_in_block / block_width + block_y * B) as u32;
+
+        self.i += 1;
+
+        if debug {
+            println!("({:02},{:02})", x, y);
+            println!("");
+        }
+
+        if y < height as u32 {
+            Some((x, y, *self.original_image.get_pixel(x, y)))
+        }
+        else {
+            None
+        }
+	}
+
+}
+
 pub fn get_offset_to_other_image(original_image : &image::RgbaImage, prev_image : &image::RgbaImage) -> (i64, i64)
 {
     let prev_x_offset = (prev_image.width() as i64 - original_image.width()  as i64)/2;
@@ -138,20 +212,32 @@ pub fn get_offset_to_other_image(original_image : &image::RgbaImage, prev_image 
     (prev_x_offset, prev_y_offset)
 }
 
-pub fn try_get_pixel(prev_xy : (u32, u32), prev_image : &image::RgbaImage) -> Option<image::Rgba<u8>>
+pub fn try_get_pixel(prev_xy : (i64, i64), prev_image : &image::RgbaImage) -> Option<image::Rgba<u8>>
 {
     let prev_x = prev_xy.0; //original_pixel_xy.0 + prev_x_offset;
     let prev_y = prev_xy.1; //original_pixel_xy.1 + prev_y_offset;
 
-    if prev_x < 0 || prev_y < 0 || prev_x >= prev_image.width() || prev_y >= prev_image.height() {
+    if prev_x < 0 || prev_y < 0 || prev_x >= prev_image.width() as i64 || prev_y >= prev_image.height() as i64 {
         return None;
     }
 
-    return Some(*prev_image.get_pixel(prev_x, prev_y));
+    return Some(*prev_image.get_pixel(prev_x as u32, prev_y as u32));
 }
 
 pub fn alt_compression_2(brotli_archive_path : &str)
 {
+    let testImage = RgbaImage::new(4, 5);
+
+    let iter = BlockImageIterator::new(&testImage, 3);
+
+    for (x,y,pix) in iter
+    {
+
+        //println!("({:02},{:02}) {:?}",x,y, pix);
+    }
+
+    return;
+
     let mut base_images : Vec<RgbaImage> = Vec::new();
     let mut relative_paths : Vec<String> = Vec::new();
 
@@ -228,8 +314,8 @@ where T: std::io::Write
                     let x = block_x_pixel + x_block_i * b;
                     let y = block_y_pixel + y_block_i * b;
                     let original_image_pixel = *original_image.get_pixel(x, y);
-                    let prev_x = (x as i64 + x_offset_to_other_image) as u32;
-                    let prev_y = (y as i64 + y_offset_to_other_image) as u32;
+                    let prev_x = (x as i64 + x_offset_to_other_image);
+                    let prev_y = (y as i64 + y_offset_to_other_image);
 
                     //check if out of range of other image. If not out of range, check equality
                     //let pixels_equal = ;
