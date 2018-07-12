@@ -2,10 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="8002edc4-ab8e-4d24-8d89-9db458a38d32" name="Default" comment="">
-      <change afterPath="$PROJECT_DIR$/src/DoubleImageIterator.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/compress.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/compress.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -16,7 +14,7 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="main.rs" pinned="false" current-in-tab="true">
+      <file leaf-file-name="main.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/main.rs">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="267">
@@ -25,11 +23,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="compress.rs" pinned="false" current-in-tab="false">
+      <file leaf-file-name="compress.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/compress.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="366">
-              <caret line="231" column="76" selection-start-line="231" selection-start-column="76" selection-end-line="231" selection-end-column="76" />
+            <state relative-caret-position="539">
+              <caret line="351" column="78" lean-forward="true" selection-start-line="351" selection-start-column="78" selection-end-line="351" selection-end-column="78" />
             </state>
           </provider>
         </entry>
@@ -37,8 +35,8 @@
       <file leaf-file-name="DoubleImageIterator.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/DoubleImageIterator.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="2222">
-              <caret line="157" selection-start-line="157" selection-end-line="157" />
+            <state relative-caret-position="709">
+              <caret line="173" column="9" selection-start-line="173" selection-start-column="9" selection-end-line="173" selection-end-column="82" />
             </state>
           </provider>
         </entry>
@@ -81,11 +79,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>fs::</find>
-      <find>CompressedImageInfo</find>
-      <find>compress_path</find>
-      <find>offset</find>
-      <find>current_start_index</find>
       <find>pause</find>
       <find>alpha</find>
       <find>read_to_en</find>
@@ -111,6 +104,11 @@
       <find>crop_region</find>
       <find>testloo</find>
       <find>bitmap_compressor</find>
+      <find>try_get</find>
+      <find>blocK_width</find>
+      <find>blocK_widthB</find>
+      <find>::new(</find>
+      <find>diffe</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -128,8 +126,8 @@
         <option value="$PROJECT_DIR$/src/common.rs" />
         <option value="$PROJECT_DIR$/src/dump.txt" />
         <option value="$PROJECT_DIR$/src/DoubleImageIterator.rs" />
-        <option value="$PROJECT_DIR$/src/compress.rs" />
         <option value="$PROJECT_DIR$/src/main.rs" />
+        <option value="$PROJECT_DIR$/src/compress.rs" />
       </list>
     </option>
   </component>
@@ -568,24 +566,24 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/main.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="267">
+          <caret line="61" column="8" selection-start-line="61" selection-start-column="8" selection-end-line="61" selection-end-column="8" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/DoubleImageIterator.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2222">
-          <caret line="157" selection-start-line="157" selection-end-line="157" />
+        <state relative-caret-position="709">
+          <caret line="173" column="9" selection-start-line="173" selection-start-column="9" selection-end-line="173" selection-end-column="82" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/compress.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="366">
-          <caret line="231" column="76" selection-start-line="231" selection-start-column="76" selection-end-line="231" selection-end-column="76" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="267">
-          <caret line="61" column="8" selection-start-line="61" selection-start-column="8" selection-end-line="61" selection-end-column="8" />
+        <state relative-caret-position="539">
+          <caret line="351" column="78" lean-forward="true" selection-start-line="351" selection-start-column="78" selection-end-line="351" selection-end-column="78" />
         </state>
       </provider>
     </entry>

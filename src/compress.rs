@@ -226,18 +226,6 @@ pub fn try_get_pixel(prev_xy : (i64, i64), prev_image : &image::RgbaImage) -> Op
 
 pub fn alt_compression_2(brotli_archive_path : &str)
 {
-    let testImage = RgbaImage::new(4, 5);
-
-    let iter = BlockImageIterator::new(&testImage, 3);
-
-    for (x,y,pix) in iter
-    {
-
-        //println!("({:02},{:02}) {:?}",x,y, pix);
-    }
-
-    return;
-
     let mut base_images : Vec<RgbaImage> = Vec::new();
     let mut relative_paths : Vec<String> = Vec::new();
 
@@ -277,13 +265,49 @@ pub fn alt_compression_2(brotli_archive_path : &str)
             println!("{:?}", overlap_info);
             let mut debug_image = RgbaImage::new(overlap_info.overlap.0, overlap_info.overlap.1);
 
-            alt_compression_2_inner(img1, img2, &mut image_compressor, &mut bitmap_compressor);
+            alt_compression_3_inner(img1, img2, &mut image_compressor, &mut bitmap_compressor);
         }
     }
 
 }
 
+pub fn alt_compression_3_inner<'s,T>(original_image : &image::RgbaImage, prev_image : &image::RgbaImage, image_compressor : &'s mut brotli::CompressorWriter<T>, bitmap_compressor : &'s mut   brotli::CompressorWriter<T>)
+where T: std::io::Write
+{
+    let (x_offset_to_other_image, y_offset_to_other_image) = get_offset_to_other_image(original_image, prev_image);
 
+    let mut difference : Vec<u8> = Vec::with_capacity(original_image.width() as usize * original_image.height() as usize);
+
+    for (x,y,original_image_pixel) in BlockImageIterator::new(&original_image, 50)
+    {
+        let original_image_pixel = *original_image.get_pixel(x, y);
+        let prev_x = (x as i64 + x_offset_to_other_image);
+        let prev_y = (y as i64 + y_offset_to_other_image);
+
+        let pixels_equal = match try_get_pixel((prev_x, prev_y), &prev_image) {
+            None => false,
+            Some(prev_pixel) => original_image_pixel == prev_pixel,
+        };
+
+        if pixels_equal {
+            difference.push(0u8);
+        }
+        else {
+            difference.push(1u8);
+            image_compressor.write(&original_image_pixel.data);
+            //TODO: update cropper
+            //cropper.update(x,y);
+        }
+    }
+
+    //crop the difference map
+    //TODO: crop difference map
+    //difference_map = difference_map.crop(copper.values)
+    bitmap_compressor.write(&difference);
+
+    //TODO: return crop region
+    //return crop_region //need to record metadata on which area of the image was cropped.
+}
 
 pub fn alt_compression_2_inner<'s,T>(original_image : &image::RgbaImage, prev_image : &image::RgbaImage, image_compressor : &'s mut brotli::CompressorWriter<T>, bitmap_compressor : &'s mut   brotli::CompressorWriter<T>)
 where T: std::io::Write
