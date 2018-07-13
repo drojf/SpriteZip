@@ -38,8 +38,23 @@ use common::verify_images;
 use std::path::{Path};
 use std::env;
 
+use common::BlockXYIterator;
+
+use image::RgbaImage;
+
 fn main()
 {
+  /*   let im = RgbaImage::new(3,5);
+    let mut count = 0;
+   for (x,y) in BlockXYIterator::new(2, (3, 5)) {
+       count += 1;
+       let pix = im.get_pixel(x,y);
+       println!("x: {} y:{} {:?} {}", x,y, pix, count);
+    }
+
+
+    return;
+*/
     //Use command line arguments to set program mode
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 { println!("Not enough arguments! Please run as 'spritezip [compress|extract|verify|selftest|alphablend]'"); return; }

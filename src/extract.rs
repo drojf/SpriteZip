@@ -81,7 +81,7 @@ pub fn extract_archive_alt(brotli_archive_path : &str, debug_mode : bool) {
         println!("expected size: {}", expected_cropped_bitmap_size as f64 );
 
         let mut cropped_bitmap = vec![0u8; expected_cropped_bitmap_size];
-        bitmap_info_decompressor.read_exact(&mut cropped_bitmap);
+        bitmap_info_decompressor.read_exact(&mut cropped_bitmap).unwrap();
 
         //reconstruct the image
         println!("Reconstructing Imgae...");
@@ -107,6 +107,20 @@ pub fn extract_archive_alt(brotli_archive_path : &str, debug_mode : bool) {
             let full_image_x = x + metadata.x;
             let full_image_y = y + metadata.y;
 
+            if x >= metadata.diff_width{
+                println!("Error - x is out of range {}", x);
+                return;
+            }
+            else if y >= metadata.diff_height  {
+                println!("Error - y out of range {}", y);
+                return;
+            }
+            else if pixel_count >= cropped_bitmap.len() {
+                println!("Error - bitmap out of range {}", pixel_count);
+                println!("Bitmap size is actually {}", cropped_bitmap.len());
+                return;
+            }
+
             *full_image.get_pixel_mut(full_image_x, full_image_y) = if cropped_bitmap[pixel_count] == 0 {
                 //pixels are the same - use previous image's pixel at this coordinate
                 let prev_image_x = (full_image_x as i64 + x_offset_to_prev_image) as u32;
@@ -117,11 +131,12 @@ pub fn extract_archive_alt(brotli_archive_path : &str, debug_mode : bool) {
             }
             else
             {
-//*full_image.get_pixel_mut(full_image_x, full_image_y) =  {
-                //pixels are different - decompress a pixel from the compressed image data
-                let mut pixel_raw_data = [0u8; 4];
-                image_data_decompressor.read(&mut pixel_raw_data);
-                image::Rgba::<u8>(pixel_raw_data)
+//*full_image.get_pixel_mut(full_image_x, full_image_y) = {
+//                    pixels are different - decompress a pixel from the compressed image data
+                    let mut pixel_raw_data = [0u8; 4];
+                    image_data_decompressor.read(&mut pixel_raw_data);
+                    image::Rgba::<u8>(pixel_raw_data)
+                    //  image::Rgba::<u8>([0u8; 4])
             };
 
             pixel_count += 1;

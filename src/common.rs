@@ -467,16 +467,29 @@ pub fn compress_buffer(img: &Vec<u8>) -> Vec<u8>
 pub struct BlockXYIterator {
     block_size : usize,
     dimensions : (usize, usize),
+    ////block_x_pixel : usize,
+    //block_y_pixel : usize,
+    //x_block_i  : usize,
+    //y_block_i  : usize,
+    num_x_blocks : usize,
+    num_y_blocks : usize,
+    i_block : usize,
     i : usize,
 }
 
 impl BlockXYIterator {
     pub fn new(block_size : usize, dimensions : (usize, usize)) -> BlockXYIterator
     {
+        let num_x_blocks = dimensions.0 / block_size + if dimensions.0 % block_size == 0 {0} else {1};
+        let num_y_blocks = dimensions.1 / block_size + if dimensions.1 % block_size == 0 {0} else {1};
+        println!("num x blocks {} num y blocks {}", num_x_blocks, num_y_blocks);
         BlockXYIterator {
             block_size,
             dimensions,
+            i_block : 0,
             i : 0,
+            num_x_blocks,
+            num_y_blocks,
         }
     }
 }
@@ -484,56 +497,204 @@ impl BlockXYIterator {
 impl Iterator for BlockXYIterator {
 type Item = (u32, u32);
 
-	//use this one?
-	fn next(&mut self) -> Option<Self::Item>
+//	//use this one?
+
+    fn next(&mut self) -> Option<Self::Item>
     {
-        let debug = false;
+        if false {
+            loop {
+                let x_in_block = self.i % self.block_size;
+                let y_in_block = (self.i / self.block_size) % self.block_size;
 
-		let B = self.block_size;
-        let i = self.i;
-        let width = self.dimensions.0;
-        let height = self.dimensions.0;
-		let pixels_per_block_row = B * width;
-        /*
+                let x_block = (self.i / (self.block_size * self.block_size)) % self.num_x_blocks;
+                let y_block = self.i / (self.block_size * self.block_size * self.num_x_blocks);
 
-        if debug { println!("i:{}", i); }
+                //println!("x_block: {} y_block: {}", x_block, y_block);
 
-		let block_y = i / pixels_per_block_row;
-		let pixels_in_previous_block_rows = block_y * pixels_per_block_row;
-		let block_height =  std::cmp::min(B, height - B * block_y);
-        if debug  { println!("block_y {} block_height {}", block_y, block_height); }
+                let returned_x = (x_in_block + x_block * self.block_size) as u32;
+                let returned_y = (y_in_block + y_block * self.block_size) as u32;
 
-		//for all rows except the last row, block_height == B.
-		//for last row, block_height = image.height() % B
-		let pixels_in_current_block_row = i - pixels_in_previous_block_rows;
-		let block_x = pixels_in_current_block_row / (B * block_height);
-        let block_width  = std::cmp::min(B, width - B * block_x);
-        if debug { println!("pixels_in_block_row  {} block_x {} block_width {}", pixels_in_current_block_row , block_x, block_width); }
+                self.i += 1;
 
-		//for the very last block, both block height and block width will != B
-		let i_in_block = pixels_in_current_block_row - block_x * (B * block_height);
-        if debug { println!("i_in_block {}", i_in_block); }
+                let x_in_range = returned_x < (self.dimensions.0 as u32);
+                let y_in_range = returned_y < (self.dimensions.1 as u32);
 
-		let x = (i_in_block % block_width + block_x * B) as u32;
-        let y = (i_in_block / block_width + block_y * B) as u32;*/
+                if x_in_range && y_in_range {
+                    return Some((returned_x, returned_y));
+                } else if y_block >= self.num_y_blocks {
+                    return None;
+                }
+            }
+        } else {
 
-        let x = (i % width) as u32;
-        let y = (i / width) as u32;
+            let x = (self.i % self.dimensions.0) as u32;
+            let y = (self.i / self.dimensions.0) as u32;
 
-        self.i += 1;
+            self.i += 1;
 
-        if debug {
-            println!("({:02},{:02})", x, y);
-            println!("");
+            if y < self.dimensions.1 as u32 {
+                Some((x, y))
+            }
+            else {
+                None
+            }
         }
 
-        if y < self.dimensions.1 as u32 {
-            Some((x, y))
-        }
-        else {
-            None
-        }
-	}
+//        let current_block_width = std::cmp::min(self.block_size, self.dimensions.0 - self.block_size * (self.));
+//        let current_block_height = std::cmp::min(self.block_size, self.dimensions.1 - self.block_size * self.);
+//
+//        //return xy
+//        let x_in_block = self.i % self.block_size;
+//        let y_in_block = self.i / self.block_size;
+//        let returned_x = (x_in_block) as u32;
+//        let returned_y = (y_in_block) as u32;
+//
+//        //update variables
+//        println!("i: {} block_i: {}", self.i, self.i_block);
+//
+//        self.i += 1;
+//        if self.i >= self.block_size * self.block_size {
+//            self.i = 0;
+//            self.i_block += 1;
+//            if self.i_block >= self.num_x_blocks * self.num_y_blocks {
+//                return None;
+//            }
+//        }
+
+//        let x_block = self.i_block % self.num_x_blocks;
+//        let y_block = self.i_block / self.num_y_blocks;
+//
+//        //calculate the actual block width for the current block (last blocks have different width)
+//        let current_block_width = if (x_block+1) * self.block_size > self.dimensions.0 {
+//            self.dimensions.0 % self.block_size
+//        } else { self.block_size };
+//
+//        let current_block_height = if (y_block+1) * self.block_size > self.dimensions.1 {
+//            self.dimensions.1 % self.block_size
+//        } else {self.block_size };
+//
+//        //let current_block_width = std::cmp::min(self.block_size, self.dimensions.0 - self.block_size * self.);
+//        //let current_block_height = std::cmp::min(self.block_size, self.dimensions.1 - self.block_size * self.);
+//
+//        println!("block width {} block height {}", current_block_width, current_block_height);
+//
+//        let x_in_block = self.i % self.block_size;
+//        let y_in_block = self.i / self.block_size;
+//
+//
+//        let returned_x = (x_in_block + x_block * self.block_size) as u32;
+//        let returned_y = (y_in_block + y_block * self.block_size) as u32;
+//
+//        self.i += 1;
+//        if self.i >= current_block_width * current_block_height {
+//            self.i = 0;
+//            println!("Finished processing block {}", self.i_block);
+//            self.i_block += 1;
+//            if self.i_block >= self.num_x_blocks * self.num_y_blocks {
+//                return None;
+//            }
+//        }
+//
+
+//        //calculate pixel position
+//        let x_in_block = i_in_block % self.block_size;
+//        let y_in_block = i_in_block / self.block_size;
+//
+//        let pixels_in_previous_blocks_in_row = self.block_size * self.x_block_i;
+//
+//        //update variables
+//        let block_width  = std::cmp::min(self.block_size, self.dimensions.0 - self.block_size * self.x_block_i);
+//        let block_height = std::cmp::min(self.block_size, self.dimensions.1 - self.block_size * self.y_block_i);
+//
+//
+//        i_in_block += 1;
+
+
+        //determine how to increment the pixel position variables
+        /*let block_width  = std::cmp::min(self.block_size, self.dimensions.0 - self.block_size * self.x_block_i);
+        let block_height = std::cmp::min(self.block_size, self.dimensions.1 - self.block_size * self.y_block_i);
+
+        let returned_x = (self.block_x_pixel + self.x_block_i * self.block_size) as u32;
+        let returned_y = (self.block_y_pixel + self.y_block_i * self.block_size) as u32;
+
+
+        self.block_x_pixel += 1;
+
+        if self.block_x_pixel >= block_width {
+            self.block_x_pixel = 0;
+            self.block_y_pixel += 1;
+
+            if self.block_y_pixel >= block_height {
+                self.block_y_pixel = 0;
+                self.x_block_i += 1;
+
+                if self.x_block_i >= self.num_x_blocks {
+                    self.x_block_i = 0;
+                    self.y_block_i += 1;
+
+                    if self.y_block_i >= self.num_y_blocks {
+                        //allow one extra iteration than normal to return the very last pixel
+                        if returned_y >= self.dimensions.1 as u32 {
+                            return None;
+                        }
+                    }
+                }
+            }
+        }*/
+
+
+    }
+
+
+//	fn next(&mut self) -> Option<Self::Item>
+//    {
+//        let debug = false;
+//
+//		let B = self.block_size;
+//        let i = self.i;
+//        let width = self.dimensions.0;
+//        let height = self.dimensions.0;
+//		let pixels_per_block_row = B * width;
+//
+//
+////        if debug { println!("i:{}", i); }
+////
+////		let block_y = i / pixels_per_block_row;
+////		let pixels_in_previous_block_rows = block_y * pixels_per_block_row;
+////		let block_height =  std::cmp::min(B, height - B * block_y);
+////        if debug  { println!("block_y {} block_height {}", block_y, block_height); }
+////
+////		//for all rows except the last row, block_height == B.
+////		//for last row, block_height = image.height() % B
+////		let pixels_in_current_block_row = i - pixels_in_previous_block_rows;
+////		let block_x = pixels_in_current_block_row / (B * block_height);
+////        let block_width  = std::cmp::min(B, width - B * block_x);
+////        if debug { println!("pixels_in_block_row  {} block_x {} block_width {}", pixels_in_current_block_row , block_x, block_width); }
+////
+////		//for the very last block, both block height and block width will != B
+////		let i_in_block = pixels_in_current_block_row - block_x * (B * block_height);
+////        if debug { println!("i_in_block {}", i_in_block); }
+////
+////		let x = (i_in_block % block_width + block_x * B) as u32;
+////        let y = (i_in_block / block_width + block_y * B) as u32;*/
+//
+//        let x = (i % width) as u32;
+//        let y = (i / width) as u32;
+//
+//        self.i += 1;
+//
+//        if debug {
+//            println!("({:02},{:02})", x, y);
+//            println!("");
+//        }
+//
+//        if y < self.dimensions.1 as u32 {
+//            Some((x, y))
+//        }
+//        else {
+//            None
+//        }
+//	}
 
 }
 
