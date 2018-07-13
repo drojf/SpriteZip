@@ -1,9 +1,6 @@
 use std::fs;
 use std::path::Path;
-use std::io::Read; //needed to use brotli read trait
-use std::io::SeekFrom;
-use std::io::Seek;
-
+use std::io::{Read, SeekFrom, Seek};
 
 use brotli;
 use bincode;
@@ -17,8 +14,6 @@ use common::{FILE_FORMAT_HEADER_LENGTH, BROTLI_BUFFER_SIZE};
 use common::get_offset_to_other_image;
 use common::BlockXYIterator;
 use common::try_get_pixel;
-
-//
 
 pub fn extract_archive_alt(brotli_archive_path : &str, _debug_mode : bool) {
     //open the brotli file for reading
@@ -80,7 +75,7 @@ pub fn extract_archive_alt(brotli_archive_path : &str, _debug_mode : bool) {
         bitmap_info_decompressor.read_exact(&mut cropped_bitmap).unwrap();
 
         //reconstruct the image
-        println!("Reconstructing Imgae...");
+        println!("Reconstructing Image...");
         let mut full_image = RgbaImage::new(metadata.output_width, metadata.output_height);
 
         let (x_offset_to_prev_image , y_offset_to_prev_image)= get_offset_to_other_image(&full_image, &prev_image);
@@ -96,44 +91,19 @@ pub fn extract_archive_alt(brotli_archive_path : &str, _debug_mode : bool) {
             }
         }
 
-        //
+        //copy pixels which were different in the new image
         let mut pixel_count = 0;
         for (x,y) in BlockXYIterator::new(50, (metadata.diff_width as usize, metadata.diff_height as usize)) {
 
             let full_image_x = x + metadata.x;
             let full_image_y = y + metadata.y;
 
-            if x >= metadata.diff_width{
-                println!("Error - x is out of range {}", x);
-                return;
+            //pixels are different - decompress a pixel from the compressed image data
+            if cropped_bitmap[pixel_count] == 1 {
+                let mut pixel_raw_data = [0u8; 4];
+                image_data_decompressor.read_exact(&mut pixel_raw_data).unwrap();
+                *full_image.get_pixel_mut(full_image_x, full_image_y) = image::Rgba::<u8>(pixel_raw_data);
             }
-            else if y >= metadata.diff_height  {
-                println!("Error - y out of range {}", y);
-                return;
-            }
-            else if pixel_count >= cropped_bitmap.len() {
-                println!("Error - bitmap out of range {}", pixel_count);
-                println!("Bitmap size is actually {}", cropped_bitmap.len());
-                return;
-            }
-
-            *full_image.get_pixel_mut(full_image_x, full_image_y) = if cropped_bitmap[pixel_count] == 0 {
-                //pixels are the same - use previous image's pixel at this coordinate
-                let prev_image_x = (full_image_x as i64 + x_offset_to_prev_image) as u32;
-                let prev_image_y = (full_image_y as i64 + y_offset_to_prev_image) as u32;
-
-                *prev_image.get_pixel(prev_image_x, prev_image_y)
-                //image::Rgba::<u8>([0u8; 4])
-            }
-            else
-            {
-//*full_image.get_pixel_mut(full_image_x, full_image_y) = {
-//                    pixels are different - decompress a pixel from the compressed image data
-                    let mut pixel_raw_data = [0u8; 4];
-                    image_data_decompressor.read_exact(&mut pixel_raw_data).unwrap();
-                    image::Rgba::<u8>(pixel_raw_data)
-                    //  image::Rgba::<u8>([0u8; 4])
-            };
 
             pixel_count += 1;
         }

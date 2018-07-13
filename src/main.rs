@@ -73,19 +73,18 @@ fn main()
     let output_basename = "compressed_images";
     let brotli_archive_path = format!("{}.brotli", output_basename);
 
+    //TODO: in selftest mode, don't run if output directory is not clear (incase 'correct' images are already in output directory)
+    //         alternatively just rename or delete the output directory.
+
     if do_brotli_compression
     {
         println!("\n\n ---------- Begin Compression... ---------- ");
         alt_compression_2(&brotli_archive_path);
-        //block_compression_test(&brotli_archive_path);
-        //alt_compression(&brotli_archive_path);
-        //compress_path(&brotli_archive_path, false, false);
     }
 
     if do_brotli_extract
     {
         println!("\n\n ---------- Begin Extraction... ---------- ");
-        //extract_archive(&brotli_archive_path, false, false);
         extract_archive_alt(&brotli_archive_path, false);
     }
 

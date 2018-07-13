@@ -249,6 +249,8 @@ pub fn alt_compression_2(brotli_archive_path : &str)
             });
 
             prev_image = image.clone(); //TODO: remove this clone?
+
+            println!("");
         }
     }
 
