@@ -30,16 +30,17 @@ extern crate time;
 
 //custom modules
 use alphablend::convert_folder_to_alphablend;
-use compress::{compress_path, block_compression_test,alt_compression, alt_compression_2};
-use extract::{extract_archive, extract_archive_alt};
+use compress::alt_compression_2;
+use extract::extract_archive_alt;
 use common::verify_images;
 
 //standard uses
 use std::path::{Path};
 use std::env;
 
+#[allow(unused_imports)]
 use common::BlockXYIterator;
-
+#[allow(unused_imports)]
 use image::RgbaImage;
 
 fn main()

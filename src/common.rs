@@ -8,7 +8,6 @@ use std::fs;
 use std::io::BufReader;
 use std::io::{Read, Write};
 use brotli;
-use number_prefix;
 use number_prefix::{decimal_prefix, Standalone, Prefixed};
 
 pub const FILE_FORMAT_HEADER_LENGTH: usize = 8;
@@ -74,68 +73,6 @@ pub fn pretty_print_percent(numerator: u64, denominator: u64) -> String
 //    let denominator_as_float = denominator.into();
 //    format!("{}%", numerator_as_float / denominator_as_float * 100.0)
 //}
-
-// TODO: crop diff'd images  so that not so much data needs to be compressed?
-/// Subtracts the canvas image from the given image, where the given image is assumed to be smaller
-/// than the canvas
-/// Eg: Performs [image - canvas] for all pixels in image.
-/// x_offset, y_offset: offsets image before performing the subtraction
-pub fn subtract_image_from_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, offset : (u32, u32))
-{
-    for (x, y, pixel) in img.enumerate_pixels()
-    {
-        let mut canvas_pixel = canvas.get_pixel_mut(x + offset.0, y + offset.1);
-
-        //TODO: disable debug mode to use alpha value
-        //must specify u8 to ensure wrapping occurs
-        let new_pixel : [u8; 4] = [
-            pixel[0].wrapping_sub(canvas_pixel[0]),
-            pixel[1].wrapping_sub(canvas_pixel[1]),
-            pixel[2].wrapping_sub(canvas_pixel[2]),
-            pixel[3].wrapping_sub(canvas_pixel[3]),
-        ];
-
-        *canvas_pixel = image::Rgba(new_pixel);
-    }
-}
-
-
-// TODO: crop diff'd images  so that not so much data needs to be compressed?
-/// Subtracts the canvas image from the given image, where the given image is assumed to be smaller
-/// than the canvas
-/// Eg: Performs [image - canvas] for all pixels in image.
-/// x_offset, y_offset: offsets image before performing the subtraction
-pub fn add_image_to_canvas(canvas: &mut image::RgbaImage, img : &image::RgbaImage, x_offset : u32, y_offset : u32)
-{
-    for (x, y, pixel) in img.enumerate_pixels()
-    {
-        let mut canvas_pixel = canvas.get_pixel_mut(x + x_offset, y + y_offset);
-
-        //TODO: disable debug mode to use alpha value
-        //must specify u8 to ensure wrapping occurs
-        let new_pixel : [u8; 4] = [
-            pixel[0].wrapping_add(canvas_pixel[0]),
-            pixel[1].wrapping_add(canvas_pixel[1]),
-            pixel[2].wrapping_add(canvas_pixel[2]),
-            pixel[3].wrapping_add(canvas_pixel[3]),
-        ];
-
-        *canvas_pixel = image::Rgba(new_pixel);
-    }
-}
-
-pub fn offset_to_bottom_center_image_value(canvas_size : (u32, u32), img_size : (u32, u32)) -> (u32, u32)
-{
-    //Calculate image offset such that image is placed at the center bottom of the canvas.
-    let x_offset = (canvas_size.0 - img_size.0) / 2;
-    let y_offset = canvas_size.1 - img_size.1;
-    (x_offset, y_offset)
-}
-
-pub fn offset_to_bottom_center_image(canvas: &image::RgbaImage, img : &image::RgbaImage) -> (u32, u32)
-{
-    offset_to_bottom_center_image_value((canvas.width(), canvas.height()), (img.width(), img.height()))
-}
 
 pub fn verify_images(input_folder : &str, output_folder : &str) -> bool
 {
@@ -297,137 +234,6 @@ pub fn save_image_no_alpha(mut image : RgbaImage, save_path : &str)
     image.save(save_path).unwrap()
 }
 
-pub fn convert_pixel_based_to_channel_based(pixel_based_image : Vec<u8>, dimensions : (u32, u32)) -> Vec<u8>
-{
-    let channel_size = pixel_based_image.len()/4;
-
-    if true
-    {
-        let mut channel_based_image = Vec::with_capacity(pixel_based_image.len());
-        let target_block_size = 50;
-        let x_num_normal_blocks = dimensions.0 / target_block_size + 1; //always do one extra, even if not needed (for now)
-        let y_num_normal_blocks = dimensions.1 / target_block_size + 1; //always do one extra, even if not needed (for now)
-
-        for y_block_i in 0..y_num_normal_blocks
-        {
-            for x_block_i in 0..x_num_normal_blocks
-            {
-                for block_y_pixel_ind in 0..target_block_size
-                {
-                    for block_x_pixel_ind in 0..target_block_size
-                    {
-                        let y_index = y_block_i * target_block_size + block_y_pixel_ind;
-                        let x_index = x_block_i * target_block_size + block_x_pixel_ind;
-
-                        //check in range
-                        if x_index >= dimensions.0 || y_index >= dimensions.1 {
-                            continue
-                        }
-
-                        let pixel_ind = (x_index + y_index * dimensions.0) as usize;
-                        channel_based_image.push(pixel_based_image[4 * pixel_ind + 0]);
-                        channel_based_image.push(pixel_based_image[4 * pixel_ind + 1]);
-                        channel_based_image.push(pixel_based_image[4 * pixel_ind + 2]);
-                        channel_based_image.push(pixel_based_image[4 * pixel_ind + 3]);
-                    }
-                }
-            }
-        }
-        return channel_based_image;
-    }
-    else if false
-    {
-        let mut channel_based_image = Vec::with_capacity(pixel_based_image.len());
-        println!("Alpha Compression");
-
-        ////////////////// RGB + A encoding///////////////////////
-        //extract RGB channels from image
-        for index_in_channel in 0..channel_size
-        {
-            channel_based_image.push(pixel_based_image[index_in_channel*4 + 0]);
-            channel_based_image.push(pixel_based_image[index_in_channel*4 + 1]);
-            channel_based_image.push(pixel_based_image[index_in_channel*4 + 2]);
-        }
-
-        println!("enc length is {}", channel_based_image.len());
-
-        //extract alpha channel only from image
-        for index_in_channel in 0..channel_size
-        {
-            channel_based_image.push(pixel_based_image[index_in_channel*4 + 3]);
-        }
-        println!("enc end is {}", channel_based_image.len());
-        return channel_based_image;
-    }
-
-    return pixel_based_image;
-}
-
-pub fn convert_channel_based_to_pixel_based(channel_based_image : Vec<u8>, dimensions : (u32, u32)) -> Vec<u8>
-{
-    let channel_size = channel_based_image.len()/4;
-
-    if true
-    {
-        let mut pixel_based_image = vec![0; channel_based_image.len()];
-        let target_block_size = 50;
-        let x_num_normal_blocks = dimensions.0 / target_block_size + 1; //always do one extra, even if not needed (for now)
-        let y_num_normal_blocks = dimensions.1 / target_block_size + 1; //always do one extra, even if not needed (for now)
-
-        let mut channel_index: usize = 0;
-        for y_block_i in 0..y_num_normal_blocks
-        {
-            for x_block_i in 0..x_num_normal_blocks
-            {
-                for block_y_pixel_ind in 0..target_block_size
-                {
-                    for block_x_pixel_ind in 0..target_block_size
-                    {
-                        let y_index = y_block_i * target_block_size + block_y_pixel_ind;
-                        let x_index = x_block_i * target_block_size + block_x_pixel_ind;
-
-                        //check in range
-                        if x_index >= dimensions.0 || y_index >= dimensions.1 {
-                            continue
-                        }
-
-                        let pixel_ind = (x_index + y_index * dimensions.0) as usize;
-                        pixel_based_image[4 * pixel_ind + 0] = channel_based_image[channel_index + 0];
-                        pixel_based_image[4 * pixel_ind + 1] = channel_based_image[channel_index + 1];
-                        pixel_based_image[4 * pixel_ind + 2] = channel_based_image[channel_index + 2];
-                        pixel_based_image[4 * pixel_ind + 3] = channel_based_image[channel_index + 3];
-                        channel_index += 4;
-                    }
-                }
-            }
-        }
-
-        println!("decompression legnth is {}", channel_index);
-        return pixel_based_image;
-    }
-    else if false
-    {
-        let mut pixel_based_image = Vec::with_capacity(channel_based_image.len());
-        println!("Alpha Compression");
-        println!("Channel size is {}", channel_size);
-        ////////////////// RGB + A decoding///////////////////////
-        //extract one pixel at a time from the channel based image
-        for index_in_channel in 0..channel_size
-        {
-            //stride is now 3 as is now a RGB image and then a ALPHA image
-            pixel_based_image.push(channel_based_image[index_in_channel * 3 + 0]);
-            pixel_based_image.push(channel_based_image[index_in_channel * 3 + 1]);
-            pixel_based_image.push(channel_based_image[index_in_channel * 3 + 2]);
-
-            pixel_based_image.push(channel_based_image[channel_size * 3 + index_in_channel]);
-        }
-        return pixel_based_image;
-    }
-
-
-    return channel_based_image;
-}
-
 pub fn compress_image_to_buffer(img: &image::RgbaImage) -> Vec<u8>
 {
     let mut retvec = Vec::with_capacity(10000);
@@ -467,13 +273,8 @@ pub fn compress_buffer(img: &Vec<u8>) -> Vec<u8>
 pub struct BlockXYIterator {
     block_size : usize,
     dimensions : (usize, usize),
-    ////block_x_pixel : usize,
-    //block_y_pixel : usize,
-    //x_block_i  : usize,
-    //y_block_i  : usize,
     num_x_blocks : usize,
     num_y_blocks : usize,
-    i_block : usize,
     i : usize,
 }
 
@@ -482,14 +283,13 @@ impl BlockXYIterator {
     {
         let num_x_blocks = dimensions.0 / block_size + if dimensions.0 % block_size == 0 {0} else {1};
         let num_y_blocks = dimensions.1 / block_size + if dimensions.1 % block_size == 0 {0} else {1};
-        println!("num x blocks {} num y blocks {}", num_x_blocks, num_y_blocks);
+
         BlockXYIterator {
             block_size,
             dimensions,
-            i_block : 0,
-            i : 0,
             num_x_blocks,
             num_y_blocks,
+            i : 0,
         }
     }
 }
@@ -501,7 +301,7 @@ type Item = (u32, u32);
 
     fn next(&mut self) -> Option<Self::Item>
     {
-        if false {
+        if true {
             loop {
                 let x_in_block = self.i % self.block_size;
                 let y_in_block = (self.i / self.block_size) % self.block_size;
@@ -539,163 +339,7 @@ type Item = (u32, u32);
                 None
             }
         }
-
-//        let current_block_width = std::cmp::min(self.block_size, self.dimensions.0 - self.block_size * (self.));
-//        let current_block_height = std::cmp::min(self.block_size, self.dimensions.1 - self.block_size * self.);
-//
-//        //return xy
-//        let x_in_block = self.i % self.block_size;
-//        let y_in_block = self.i / self.block_size;
-//        let returned_x = (x_in_block) as u32;
-//        let returned_y = (y_in_block) as u32;
-//
-//        //update variables
-//        println!("i: {} block_i: {}", self.i, self.i_block);
-//
-//        self.i += 1;
-//        if self.i >= self.block_size * self.block_size {
-//            self.i = 0;
-//            self.i_block += 1;
-//            if self.i_block >= self.num_x_blocks * self.num_y_blocks {
-//                return None;
-//            }
-//        }
-
-//        let x_block = self.i_block % self.num_x_blocks;
-//        let y_block = self.i_block / self.num_y_blocks;
-//
-//        //calculate the actual block width for the current block (last blocks have different width)
-//        let current_block_width = if (x_block+1) * self.block_size > self.dimensions.0 {
-//            self.dimensions.0 % self.block_size
-//        } else { self.block_size };
-//
-//        let current_block_height = if (y_block+1) * self.block_size > self.dimensions.1 {
-//            self.dimensions.1 % self.block_size
-//        } else {self.block_size };
-//
-//        //let current_block_width = std::cmp::min(self.block_size, self.dimensions.0 - self.block_size * self.);
-//        //let current_block_height = std::cmp::min(self.block_size, self.dimensions.1 - self.block_size * self.);
-//
-//        println!("block width {} block height {}", current_block_width, current_block_height);
-//
-//        let x_in_block = self.i % self.block_size;
-//        let y_in_block = self.i / self.block_size;
-//
-//
-//        let returned_x = (x_in_block + x_block * self.block_size) as u32;
-//        let returned_y = (y_in_block + y_block * self.block_size) as u32;
-//
-//        self.i += 1;
-//        if self.i >= current_block_width * current_block_height {
-//            self.i = 0;
-//            println!("Finished processing block {}", self.i_block);
-//            self.i_block += 1;
-//            if self.i_block >= self.num_x_blocks * self.num_y_blocks {
-//                return None;
-//            }
-//        }
-//
-
-//        //calculate pixel position
-//        let x_in_block = i_in_block % self.block_size;
-//        let y_in_block = i_in_block / self.block_size;
-//
-//        let pixels_in_previous_blocks_in_row = self.block_size * self.x_block_i;
-//
-//        //update variables
-//        let block_width  = std::cmp::min(self.block_size, self.dimensions.0 - self.block_size * self.x_block_i);
-//        let block_height = std::cmp::min(self.block_size, self.dimensions.1 - self.block_size * self.y_block_i);
-//
-//
-//        i_in_block += 1;
-
-
-        //determine how to increment the pixel position variables
-        /*let block_width  = std::cmp::min(self.block_size, self.dimensions.0 - self.block_size * self.x_block_i);
-        let block_height = std::cmp::min(self.block_size, self.dimensions.1 - self.block_size * self.y_block_i);
-
-        let returned_x = (self.block_x_pixel + self.x_block_i * self.block_size) as u32;
-        let returned_y = (self.block_y_pixel + self.y_block_i * self.block_size) as u32;
-
-
-        self.block_x_pixel += 1;
-
-        if self.block_x_pixel >= block_width {
-            self.block_x_pixel = 0;
-            self.block_y_pixel += 1;
-
-            if self.block_y_pixel >= block_height {
-                self.block_y_pixel = 0;
-                self.x_block_i += 1;
-
-                if self.x_block_i >= self.num_x_blocks {
-                    self.x_block_i = 0;
-                    self.y_block_i += 1;
-
-                    if self.y_block_i >= self.num_y_blocks {
-                        //allow one extra iteration than normal to return the very last pixel
-                        if returned_y >= self.dimensions.1 as u32 {
-                            return None;
-                        }
-                    }
-                }
-            }
-        }*/
-
-
     }
-
-
-//	fn next(&mut self) -> Option<Self::Item>
-//    {
-//        let debug = false;
-//
-//		let B = self.block_size;
-//        let i = self.i;
-//        let width = self.dimensions.0;
-//        let height = self.dimensions.0;
-//		let pixels_per_block_row = B * width;
-//
-//
-////        if debug { println!("i:{}", i); }
-////
-////		let block_y = i / pixels_per_block_row;
-////		let pixels_in_previous_block_rows = block_y * pixels_per_block_row;
-////		let block_height =  std::cmp::min(B, height - B * block_y);
-////        if debug  { println!("block_y {} block_height {}", block_y, block_height); }
-////
-////		//for all rows except the last row, block_height == B.
-////		//for last row, block_height = image.height() % B
-////		let pixels_in_current_block_row = i - pixels_in_previous_block_rows;
-////		let block_x = pixels_in_current_block_row / (B * block_height);
-////        let block_width  = std::cmp::min(B, width - B * block_x);
-////        if debug { println!("pixels_in_block_row  {} block_x {} block_width {}", pixels_in_current_block_row , block_x, block_width); }
-////
-////		//for the very last block, both block height and block width will != B
-////		let i_in_block = pixels_in_current_block_row - block_x * (B * block_height);
-////        if debug { println!("i_in_block {}", i_in_block); }
-////
-////		let x = (i_in_block % block_width + block_x * B) as u32;
-////        let y = (i_in_block / block_width + block_y * B) as u32;*/
-//
-//        let x = (i % width) as u32;
-//        let y = (i / width) as u32;
-//
-//        self.i += 1;
-//
-//        if debug {
-//            println!("({:02},{:02})", x, y);
-//            println!("");
-//        }
-//
-//        if y < self.dimensions.1 as u32 {
-//            Some((x, y))
-//        }
-//        else {
-//            None
-//        }
-//	}
-
 }
 
 
