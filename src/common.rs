@@ -15,6 +15,7 @@ pub const BROTLI_BUFFER_SIZE: usize = 4096; //buffer size used for compression a
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DecompressionInfo {
     pub canvas_size: (u32, u32),
+    pub bitmap_data_start : u64,
     pub images_info:  Vec<CompressedImageInfo>,
 }
 

@@ -5,6 +5,7 @@ use std::fs::File;
 use time;
 use std::io::SeekFrom;
 use std::io::Seek;
+use std::iter::Iterator;
 
 //non-standard use
 use serde_json;
@@ -13,6 +14,7 @@ use bincode;
 use brotli;
 use image;
 use image::{RgbaImage, GenericImage};
+use walkdir;
 use walkdir::WalkDir;
 
 use common::{CompressedImageInfo, DecompressionInfo};
@@ -186,6 +188,63 @@ fn measure_similarity(img1: &image::RgbaImage, img2: &image::RgbaImage)
 
 }
 
+//skips over folders and files not of the correct type
+/*fn get_files_of_type(root : &str, file_type : &str) -> std::iter::<Iterator>::Filter
+{
+    let root_iter = WalkDir::new(root).into_iter();
+
+    root_iter.filter(|entry| {
+        let entry = entry.as_ref().unwrap();
+        entry.file_type().is_file() && match entry.path().extension() {
+                None => false,
+                Some(ext) => ext == file_type,
+            }
+    })
+}*/
+
+struct FileTypeIterator<'s> {
+    walkdir_iterator : walkdir::IntoIter,
+    file_type : &'s str,
+}
+
+impl<'s> FileTypeIterator<'s> {
+    fn new(root : &'s str, file_type : &'s str) -> FileTypeIterator<'s>
+    {
+        FileTypeIterator {
+            walkdir_iterator : WalkDir::new(root).into_iter(),
+            file_type : file_type,
+        }
+    }
+}
+
+impl<'s> Iterator for FileTypeIterator<'s>  {
+type Item = (walkdir::DirEntry);
+	fn next(&mut self) -> Option<Self::Item>
+    {
+        loop {
+            let entry = match self.walkdir_iterator.next() {
+                None => return None,
+                Some(ent) => ent.unwrap(),
+            };
+
+            let is_file = entry.file_type().is_file();
+
+            let extension_matches = match entry.path().extension() {
+                None => false,
+                Some(ext) => ext == self.file_type,
+            };
+
+            if is_file && extension_matches {
+                return Some(entry);
+            }
+            else
+            {
+                continue
+            }
+        }
+	}
+}
+
 
 struct BlockImageIterator<'s> {
     original_image : &'s image::RgbaImage,
@@ -279,47 +338,149 @@ pub fn try_get_pixel(prev_xy : (i64, i64), prev_image : &image::RgbaImage) -> Op
     return Some(*prev_image.get_pixel(prev_x as u32, prev_y as u32));
 }
 
+//new image format:
+// format 1
+// format                              data name                       description
+//---------------------------------------------------------------------------------------------------
+//[u64]                                 metadata_start_index
+//[brotli compresed Vec<u8>]            compressed_image_bitmap_1       - uncompressed size is crop_region_width * crop_region_height * 1 (one byte per pixel)
+//[brotli compressed image Rgba<u8>]    compressed_image_data_1         - uncompressed size is equal to the number of '1's in the bitmap
+//                                      compressed_image_bitmap_2
+//                                      compressed_image_data_2
+// ...more images go here...
+//[brotli compressed metadata struct]   metadata struct for everything  - (holds start locations of each compressed image data and bitmap
+//                                                                        Must read this first to decode images
+
+//format2
+// format                              data name                       description
+//---------------------------------------------------------------------------------------------------
+//(optional? general image data at start of file?
+//[brotli compressed image metadata]    compressed_image_metadata_1     - use bincode::deserialize_from to get struct out of compressed data.
+//[brotli compresed Vec<u8>]            compressed_image_bitmap_1       - uncompressed size is crop_region_width * crop_region_height * 1 (one byte per pixel)
+//[brotli compressed image Rgba<u8>]    compressed_image_data_1         - uncompressed size is equal to the number of '1's in the bitmap
+//                                      compressed_image_metadata_2
+//                                      compressed_image_bitmap_2
+//                                      compressed_image_data_2
+// ...more images go here...
+// to ensure compression effiency:
+// For this method, should make three compressors backed by vecs.
+// For each iteration,
+//      run the algorithm to save compressed data to the three vectors
+//      dump the vectors into the file
+
+//format3
+// format                              data name                       description
+//---------------------------------------------------------------------------------------------------
+//[u64]                                 metadata_start_index
+//[brotli compresed Vec<u8>]            compressed_image_bitmap_ALL       - uncompressed size is crop_region_width * crop_region_height * 1 (one byte per pixel)
+//[brotli compressed image Rgba<u8>]    compressed_image_data_ALL         - uncompressed size is equal to the number of '1's in the bitmap
+//[brotli compressed imageS metadata]   compressed_image_metadata_1       - use bincode::deserialize_from to get struct out of compressed data.
+
+// ...more images go here...
+// to ensure compression effiency:
+// For this method, should make the big image data backed by a file, and the remaining two backed by Vec<u8> (they should be small, even with 10,000 images. Should print this out to check size
+// For each iteration,
+//    compress the
+//
+
+
 pub fn alt_compression_2(brotli_archive_path : &str)
 {
-    let mut base_images : Vec<RgbaImage> = Vec::new();
-    let mut relative_paths : Vec<String> = Vec::new();
-
-    //Create compressors for image data and bitmap
     let brotli_quality = 11;
     let brotli_window = 24;
-    let brotli_file = File::create("alt_image.brotli").expect("Cannot create file");
-    let mut image_compressor = brotli::CompressorWriter::new(brotli_file,BROTLI_BUFFER_SIZE,brotli_quality,brotli_window);
-    let brotli_file_2 = File::create("alt_diff.brotli").expect("Cannot create file");
-    let mut bitmap_compressor = brotli::CompressorWriter::new(brotli_file_2, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window);
 
-    for entry in WalkDir::new("input_images")
+    //TODO: don't need these - just need to store two images at a time
+    let mut base_images: Vec<RgbaImage> = Vec::new();
+    let mut relative_paths: Vec<String> = Vec::new();
+
+    //Create object to store all image metadata (but not the global metadata)
+    let mut images_info : Vec<CompressedImageInfo> = Vec::new();
+
+    let mut compressed_bitmap_data_vector = Vec::new();
+
+    let mut archive_file = File::create("alt_image.brotli").expect("Cannot create file");
+
+    //Allocate some space for the file format header
+    archive_file.write(&[0; FILE_FORMAT_HEADER_LENGTH]).expect("Unable to allocate header space in file");
+
+    //scope for compression/file objects (most of the work)
     {
-        let ent = entry.unwrap();
-        if ent.file_type().is_dir() {
-            continue;
+        //Create compressors for image data and bitmap
+        let mut image_compressor = brotli::CompressorWriter::new(&archive_file, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window);
+        let mut bitmap_compressor = brotli::CompressorWriter::new(&mut compressed_bitmap_data_vector, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window);
+
+        for ent in FileTypeIterator::new("input_images", "png") {
+            let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
+            relative_paths.push(String::from(path_relative_to_input_folder));
+
+            let img_dyn = image::open(ent.path()).unwrap();
+            let img = img_dyn.as_rgba8().unwrap();
+            base_images.push(img.clone());
+
+            println!("Image Path: {}", path_relative_to_input_folder);
         }
 
-        let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
-        relative_paths.push(String::from(path_relative_to_input_folder));
+        //let mut crop_information : Vec<CropRegion> = Vec::new();
+        for i in 0..base_images.len() - 1 {
+            let prev_image = &base_images[i];
+            let image = &base_images[i + 1];
 
-        let img_dyn = image::open(ent.path()).unwrap();
-        let img = img_dyn.as_rgba8().unwrap();
-        base_images.push(img.clone());
-
-        println!("Image Path: {}", path_relative_to_input_folder);
+            let crop_region = alt_compression_3_inner(image, prev_image, &mut image_compressor, &mut bitmap_compressor);
+            images_info.push(CompressedImageInfo {
+                start_index: 0, //not used
+                x: crop_region.top_left.0,
+                y: crop_region.top_left.1,
+                diff_width: crop_region.dimensions.0,
+                diff_height: crop_region.dimensions.1,
+                output_width: image.width(),
+                output_height: image.height(),
+                output_path: relative_paths[i].clone(),
+            });
+        }
     }
 
-    for i in 0..base_images.len() - 1 {
-        let img1 = &base_images[i];
-        let img2 = &base_images[i + 1];
+    //Save the already compressed bitmap, keeping track of the offset
+    let bitmap_data_start = archive_file.seek(SeekFrom::Current(0)).unwrap();
+    archive_file.write_all(&compressed_bitmap_data_vector);
 
-        alt_compression_3_inner(img1, img2, &mut image_compressor, &mut bitmap_compressor);
+    //create the metadata struct
+    let decompression_info = DecompressionInfo {
+        canvas_size: (0, 0), //TODO: remove this - it's not used
+        bitmap_data_start,
+        images_info,
+    };
+
+    //Compress and save the metadata
+    let metadata_start = archive_file.seek(SeekFrom::Current(0)).unwrap();
+    let serialized_metadata = bincode::serialize(&decompression_info).unwrap();
+    {
+        brotli::CompressorWriter::new(&archive_file, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window)
+            .write_all(&serialized_metadata);
     }
 
+    //save end of file location
+    let end_of_file = archive_file.seek(SeekFrom::Current(0)).unwrap();
+
+    //return to start of file to write metadata offset
+    archive_file.seek(SeekFrom::Start(0)).unwrap();
+    archive_file.write(&u64_to_u8_buf_little_endian(metadata_start)).expect("Unable to write header offset to file");
+
+    //rewrite the 64-bit offset at start of file
+    let uncompressed_metadata_size =  serialized_metadata.len();
+    let metadata_length_bytes = end_of_file - metadata_start;
+    let metadata_as_percentage_of_total = metadata_length_bytes as f64 / end_of_file as f64 * 100.0;
+
+    println!("\n\n ------------ Compression Finished! ------------");
+    println!("Total archive size is {}mbytes", end_of_file as f64 / 1e6);
+    println!("Metadata is {} kbytes ({} uncompressed), {}% of total",
+             metadata_length_bytes as f64 / 1000.0,
+             uncompressed_metadata_size as f64 / 1000.0,
+             metadata_as_percentage_of_total);
 }
 
-pub fn alt_compression_3_inner<'s,T>(original_image : &image::RgbaImage, prev_image : &image::RgbaImage, image_compressor : &'s mut brotli::CompressorWriter<T>, bitmap_compressor : &'s mut   brotli::CompressorWriter<T>) -> CropRegion
-where T: std::io::Write
+pub fn alt_compression_3_inner<'s,T,V>(original_image : &image::RgbaImage, prev_image : &image::RgbaImage, image_compressor : &'s mut brotli::CompressorWriter<T>, bitmap_compressor : &'s mut   brotli::CompressorWriter<V>) -> CropRegion
+where T: std::io::Write,
+      V: std::io::Write
 {
     let mut cropper = Cropper::new((original_image.width(), original_image.height()));
 
@@ -916,6 +1077,7 @@ pub fn compress_path(brotli_archive_path : &str, use_json : bool, debug_mode : b
     //Save decompression info to file, and record its length
     let decompression_info = DecompressionInfo {
         canvas_size: (canvas_width, canvas_height),
+        bitmap_data_start: 0,
         images_info: images_meta_info,
     };
 
