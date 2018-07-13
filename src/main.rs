@@ -22,6 +22,7 @@ extern crate bincode;
 extern crate image;
 extern crate brotli;
 extern crate walkdir;
+extern crate number_prefix;
 
 //standard crates
 extern crate core;

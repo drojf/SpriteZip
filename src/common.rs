@@ -8,6 +8,8 @@ use std::fs;
 use std::io::BufReader;
 use std::io::{Read, Write};
 use brotli;
+use number_prefix;
+use number_prefix::{decimal_prefix, Standalone, Prefixed};
 
 pub const FILE_FORMAT_HEADER_LENGTH: usize = 8;
 pub const BROTLI_BUFFER_SIZE: usize = 4096; //buffer size used for compression and decompression
@@ -36,6 +38,35 @@ pub struct CompressedImageInfo {
     pub output_path: String,
 }
 
+pub fn pretty_print_bytes(value : f64) -> String
+{
+    match decimal_prefix(value as f64) {
+        Standalone(bytes)   => format!("{} bytes", bytes),
+        Prefixed(prefix, n) => format!("{:.2} {}B", n, prefix),
+    }
+}
+
+pub fn pretty_print_percent(numerator: u64, denominator: u64) -> String
+{
+    format!("{:.3}%", numerator as f64 / denominator as f64 * 100.0)
+}
+
+//TODO: I don't know how to convert u64 into f64 and allow precision loss generically
+//pub fn pretty_print_bytes<T>(value : T) -> String
+//{
+//    match decimal_prefix(value) {
+//        Standalone(bytes)   => format!("{} bytes", bytes),
+//        Prefixed(prefix, n) => format!("{:.0} {}B", n, prefix),
+//    }
+//}
+//pub fn pretty_print_percent<T,V>(numerator: T, denominator: V) -> String
+//where T : Into<f64>,
+//V : Into<f64>
+//{
+//    let numerator_as_float = numerator.into();
+//    let denominator_as_float = denominator.into();
+//    format!("{}%", numerator_as_float / denominator_as_float * 100.0)
+//}
 
 // TODO: crop diff'd images  so that not so much data needs to be compressed?
 /// Subtracts the canvas image from the given image, where the given image is assumed to be smaller

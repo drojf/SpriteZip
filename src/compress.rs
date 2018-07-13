@@ -17,6 +17,7 @@ use image::{RgbaImage, GenericImage};
 use walkdir;
 use walkdir::WalkDir;
 
+use common::{pretty_print_bytes, pretty_print_percent};
 use common::{CompressedImageInfo, DecompressionInfo};
 use common::subtract_image_from_canvas;
 use common::offset_to_bottom_center_image;
@@ -459,23 +460,26 @@ pub fn alt_compression_2(brotli_archive_path : &str)
     }
 
     //save end of file location
-    let end_of_file = archive_file.seek(SeekFrom::Current(0)).unwrap();
+    let file_size = archive_file.seek(SeekFrom::Current(0)).unwrap();
 
     //return to start of file to write metadata offset
     archive_file.seek(SeekFrom::Start(0)).unwrap();
     archive_file.write(&u64_to_u8_buf_little_endian(metadata_start)).expect("Unable to write header offset to file");
 
-    //rewrite the 64-bit offset at start of file
-    let uncompressed_metadata_size =  serialized_metadata.len();
-    let metadata_length_bytes = end_of_file - metadata_start;
-    let metadata_as_percentage_of_total = metadata_length_bytes as f64 / end_of_file as f64 * 100.0;
+    //Print debug information
+    let bitmap_data_length = metadata_start - bitmap_data_start;
+    let metadata_length_bytes = file_size - metadata_start;
 
     println!("\n\n ------------ Compression Finished! ------------");
-    println!("Total archive size is {}mbytes", end_of_file as f64 / 1e6);
-    println!("Metadata is {} kbytes ({} uncompressed), {}% of total",
-             metadata_length_bytes as f64 / 1000.0,
-             uncompressed_metadata_size as f64 / 1000.0,
-             metadata_as_percentage_of_total);
+    println!("Total archive size is {}", pretty_print_bytes(file_size as f64));
+    println!("Bitmap data is {}, {} of total",
+             pretty_print_bytes(bitmap_data_length as f64),
+             pretty_print_percent(bitmap_data_length, file_size));
+
+    println!("Metadata is {} ({} uncompressed), {} of total",
+             pretty_print_bytes(metadata_length_bytes as f64),
+             pretty_print_bytes(serialized_metadata.len() as f64),
+             pretty_print_percent(metadata_length_bytes, file_size));
 }
 
 pub fn alt_compression_3_inner<'s,T,V>(original_image : &image::RgbaImage, prev_image : &image::RgbaImage, image_compressor : &'s mut brotli::CompressorWriter<T>, bitmap_compressor : &'s mut   brotli::CompressorWriter<V>) -> CropRegion
@@ -511,7 +515,7 @@ where T: std::io::Write,
 
     //crop the difference map
     let crop_region = cropper.get_crop_region();
-    println!("Crop region is {:?}", crop_region);
+    println!("{:?}", crop_region);
     let mut difference_cropped = Vec::with_capacity(crop_region.dimensions.0 as usize * crop_region.dimensions.1 as usize);
     for y in 0..crop_region.dimensions.1 as usize {
         for x in 0..crop_region.dimensions.0 as usize {
