@@ -390,16 +390,12 @@ pub fn alt_compression_2(brotli_archive_path : &str)
     let brotli_quality = 11;
     let brotli_window = 24;
 
-    //TODO: don't need these - just need to store two images at a time
-    let mut base_images: Vec<RgbaImage> = Vec::new();
-    let mut relative_paths: Vec<String> = Vec::new();
-
     //Create object to store all image metadata (but not the global metadata)
     let mut images_info : Vec<CompressedImageInfo> = Vec::new();
 
     let mut compressed_bitmap_data_vector = Vec::new();
 
-    let mut archive_file = File::create("alt_image.brotli").expect("Cannot create file");
+    let mut archive_file = File::create(brotli_archive_path).expect("Cannot create file");
 
     //Allocate some space for the file format header
     archive_file.write(&[0; FILE_FORMAT_HEADER_LENGTH]).expect("Unable to allocate header space in file");
@@ -410,23 +406,17 @@ pub fn alt_compression_2(brotli_archive_path : &str)
         let mut image_compressor = brotli::CompressorWriter::new(&archive_file, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window);
         let mut bitmap_compressor = brotli::CompressorWriter::new(&mut compressed_bitmap_data_vector, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window);
 
+        let mut prev_image = image::RgbaImage::new(0,0);
+
         for ent in FileTypeIterator::new("input_images", "png") {
             let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
-            relative_paths.push(String::from(path_relative_to_input_folder));
 
             let img_dyn = image::open(ent.path()).unwrap();
-            let img = img_dyn.as_rgba8().unwrap();
-            base_images.push(img.clone());
+            let image = img_dyn.as_rgba8().unwrap();
 
             println!("Image Path: {}", path_relative_to_input_folder);
-        }
 
-        //let mut crop_information : Vec<CropRegion> = Vec::new();
-        for i in 0..base_images.len() - 1 {
-            let prev_image = &base_images[i];
-            let image = &base_images[i + 1];
-
-            let crop_region = alt_compression_3_inner(image, prev_image, &mut image_compressor, &mut bitmap_compressor);
+            let crop_region = alt_compression_3_inner(&image, &prev_image, &mut image_compressor, &mut bitmap_compressor);
             images_info.push(CompressedImageInfo {
                 start_index: 0, //not used
                 x: crop_region.top_left.0,
@@ -435,24 +425,24 @@ pub fn alt_compression_2(brotli_archive_path : &str)
                 diff_height: crop_region.dimensions.1,
                 output_width: image.width(),
                 output_height: image.height(),
-                output_path: relative_paths[i].clone(),
+                output_path: path_relative_to_input_folder.to_string(),
             });
+
+            prev_image = image.clone(); //TODO: remove this clone?
         }
     }
 
-    //Save the already compressed bitmap, keeping track of the offset
+    //Save the already compressed bitmap, recording where it starts in the file
     let bitmap_data_start = archive_file.seek(SeekFrom::Current(0)).unwrap();
     archive_file.write_all(&compressed_bitmap_data_vector);
 
-    //create the metadata struct
+    //Compress and save the metadata, recording the start location in the file
+    let metadata_start = archive_file.seek(SeekFrom::Current(0)).unwrap();
     let decompression_info = DecompressionInfo {
         canvas_size: (0, 0), //TODO: remove this - it's not used
         bitmap_data_start,
         images_info,
     };
-
-    //Compress and save the metadata
-    let metadata_start = archive_file.seek(SeekFrom::Current(0)).unwrap();
     let serialized_metadata = bincode::serialize(&decompression_info).unwrap();
     {
         brotli::CompressorWriter::new(&archive_file, BROTLI_BUFFER_SIZE, brotli_quality, brotli_window)
@@ -490,6 +480,7 @@ where T: std::io::Write,
 
     let (x_offset_to_other_image, y_offset_to_other_image) = get_offset_to_other_image(original_image, prev_image);
 
+    let mut debug_difference_count = 0;
     let mut difference : Vec<u8> = Vec::with_capacity(original_image.width() as usize * original_image.height() as usize);
 
     for (x,y,original_image_pixel) in BlockImageIterator::new(&original_image, 50)
@@ -505,6 +496,7 @@ where T: std::io::Write,
 
         if pixels_equal {
             difference.push(0u8);
+            debug_difference_count += 1;
         }
         else {
             difference.push(1u8);
@@ -515,7 +507,7 @@ where T: std::io::Write,
 
     //crop the difference map
     let crop_region = cropper.get_crop_region();
-    println!("{:?}", crop_region);
+    println!("Images are {} identical. {:?}", pretty_print_percent(debug_difference_count, original_image.width() as u64 * original_image.height() as u64), crop_region);
     let mut difference_cropped = Vec::with_capacity(crop_region.dimensions.0 as usize * crop_region.dimensions.1 as usize);
     for y in 0..crop_region.dimensions.1 as usize {
         for x in 0..crop_region.dimensions.0 as usize {
