@@ -228,13 +228,13 @@ pub fn alt_compression_2(brotli_archive_path : &str)
 
         let mut prev_image = image::RgbaImage::new(0,0);
 
-        for ent in FileTypeIterator::new("input_images", "png") {
+        for (img_count, ent) in FileTypeIterator::new("input_images", "png").enumerate() {
             let path_relative_to_input_folder = ent.path().strip_prefix("input_images").unwrap().to_str().unwrap();
 
             let img_dyn = image::open(ent.path()).unwrap();
             let image = img_dyn.as_rgba8().unwrap();
 
-            println!("Image Path: {}", path_relative_to_input_folder);
+            print!("{}: ", img_count + 1);
 
             let crop_region = alt_compression_3_inner(&image, &prev_image, &mut image_compressor, &mut bitmap_compressor);
             images_info.push(CompressedImageInfo {
@@ -249,7 +249,7 @@ pub fn alt_compression_2(brotli_archive_path : &str)
             });
 
             prev_image = image.clone(); //TODO: remove this clone?
-
+            print!("{}", path_relative_to_input_folder);
             println!("");
         }
     }
@@ -321,13 +321,13 @@ where T: std::io::Write,
 
     //Get a cropped version of the image to work on
     let crop_region = cropper.get_crop_region();
-    println!("Images are {} identical. {:?}", pretty_print_percent(debug_difference_count, original_image.width() as u64 * original_image.height() as u64), crop_region);
+    print!("Sim: {} ", pretty_print_percent(debug_difference_count, original_image.width() as u64 * original_image.height() as u64));
+    print!("CropTL: ({:4},{:4}) ", crop_region.top_left.0, crop_region.top_left.1);
+    print!("CropSize: ({:4},{:4}) ", crop_region.dimensions.0, crop_region.dimensions.1);
 
     let cropped_image = image::imageops::crop(&mut original_image.clone(),
     crop_region.top_left.0, crop_region.top_left.1,
     crop_region.dimensions.0, crop_region.dimensions.1).to_image();
-
-    println!("Actual image dimensions (should match) {} {} num pixels {}", cropped_image.width(), cropped_image.height(), cropped_image.width() * cropped_image.height());
 
     // ----------------------------  DO COMPRESS  ----------------------------
     let mut debug_difference_count = 0;
@@ -354,8 +354,6 @@ where T: std::io::Write,
             image_compressor.write(&cropped_pixel.data).unwrap();
         }
     }
-
-    println!("bitmap difference size is {}", difference.len());
 
     bitmap_compressor.write(&difference).unwrap();
 

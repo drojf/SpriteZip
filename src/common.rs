@@ -54,7 +54,7 @@ pub fn pretty_print_bytes(value : f64) -> String
 
 pub fn pretty_print_percent(numerator: u64, denominator: u64) -> String
 {
-    format!("{:.3}%", numerator as f64 / denominator as f64 * 100.0)
+    format!("{:7.3}%", numerator as f64 / denominator as f64 * 100.0)
 }
 
 //TODO: I don't know how to convert u64 into f64 and allow precision loss generically

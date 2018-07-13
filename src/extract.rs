@@ -15,7 +15,7 @@ use common::get_offset_to_other_image;
 use common::BlockXYIterator;
 use common::try_get_pixel;
 
-pub fn extract_archive_alt(brotli_archive_path : &str, _debug_mode : bool) {
+pub fn extract_archive_alt(brotli_archive_path : &str, debug_mode : bool) {
     //open the brotli file for reading
     let mut brotli_file = fs::File::open(brotli_archive_path).unwrap();
 
@@ -64,22 +64,27 @@ pub fn extract_archive_alt(brotli_archive_path : &str, _debug_mode : bool) {
 
     for (img_count, metadata) in decompression_info.images_info.into_iter().enumerate()
     {
-        println!("Extracting Image {} - meta: {:?}", img_count, metadata);
+        if debug_mode { println!("Extracting Image {} - meta: {:?}", img_count, metadata); }
+        else {
+            print!("{}: ", img_count + 1);
+            print!("diff: ({:4},{:4}) ", metadata.diff_width, metadata.diff_height);
+            print!("full: ({:4},{:4}) ", metadata.output_width, metadata.output_height);
+            print!("{}", metadata.output_path);
+            println!("");
+        }
 
         //take a slice which contains only the desired region
         //read out the required number of bytes
         let expected_cropped_bitmap_size = metadata.diff_width as usize * metadata.diff_height as usize;
-        println!("expected size: {}", expected_cropped_bitmap_size as f64 );
 
         let mut cropped_bitmap = vec![0u8; expected_cropped_bitmap_size];
         bitmap_info_decompressor.read_exact(&mut cropped_bitmap).unwrap();
 
         //reconstruct the image
-        println!("Reconstructing Image...");
         let mut full_image = RgbaImage::new(metadata.output_width, metadata.output_height);
 
         let (x_offset_to_prev_image , y_offset_to_prev_image)= get_offset_to_other_image(&full_image, &prev_image);
-        println!("Offset to other image: ({},{})", x_offset_to_prev_image , y_offset_to_prev_image);
+        if debug_mode { println!("Offset to other image: ({},{})", x_offset_to_prev_image , y_offset_to_prev_image); }
 
         //copy over the original image TODO: find a better way to do this?
         for y in 0..full_image.height() {
@@ -112,8 +117,6 @@ pub fn extract_archive_alt(brotli_archive_path : &str, _debug_mode : bool) {
         let output_image_path = Path::new("output_images").join(&metadata.output_path);
         fs::create_dir_all(output_image_path.parent().unwrap()).unwrap();
         full_image.save(output_image_path).unwrap();
-
-        println!("");
 
         prev_image = full_image;
     }
