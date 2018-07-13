@@ -14,6 +14,13 @@ use number_prefix::{decimal_prefix, Standalone, Prefixed};
 pub const FILE_FORMAT_HEADER_LENGTH: usize = 8;
 pub const BROTLI_BUFFER_SIZE: usize = 4096; //buffer size used for compression and decompression
 
+pub fn get_offset_to_other_image(original_image : &image::RgbaImage, prev_image : &image::RgbaImage) -> (i64, i64)
+{
+    let prev_x_offset = (prev_image.width() as i64 - original_image.width()  as i64)/2;
+    let prev_y_offset = prev_image.height() as i64 - original_image.height() as i64;
+    (prev_x_offset, prev_y_offset)
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DecompressionInfo {
     pub canvas_size: (u32, u32),
@@ -454,4 +461,91 @@ pub fn compress_buffer(img: &Vec<u8>) -> Vec<u8>
     }
 
     return retvec;
+}
+
+
+pub struct BlockXYIterator {
+    block_size : usize,
+    dimensions : (usize, usize),
+    i : usize,
+}
+
+impl BlockXYIterator {
+    pub fn new(block_size : usize, dimensions : (usize, usize)) -> BlockXYIterator
+    {
+        BlockXYIterator {
+            block_size,
+            dimensions,
+            i : 0,
+        }
+    }
+}
+
+impl Iterator for BlockXYIterator {
+type Item = (u32, u32);
+
+	//use this one?
+	fn next(&mut self) -> Option<Self::Item>
+    {
+        let debug = false;
+
+		let B = self.block_size;
+        let i = self.i;
+        let width = self.dimensions.0;
+        let height = self.dimensions.0;
+		let pixels_per_block_row = B * width;
+        /*
+
+        if debug { println!("i:{}", i); }
+
+		let block_y = i / pixels_per_block_row;
+		let pixels_in_previous_block_rows = block_y * pixels_per_block_row;
+		let block_height =  std::cmp::min(B, height - B * block_y);
+        if debug  { println!("block_y {} block_height {}", block_y, block_height); }
+
+		//for all rows except the last row, block_height == B.
+		//for last row, block_height = image.height() % B
+		let pixels_in_current_block_row = i - pixels_in_previous_block_rows;
+		let block_x = pixels_in_current_block_row / (B * block_height);
+        let block_width  = std::cmp::min(B, width - B * block_x);
+        if debug { println!("pixels_in_block_row  {} block_x {} block_width {}", pixels_in_current_block_row , block_x, block_width); }
+
+		//for the very last block, both block height and block width will != B
+		let i_in_block = pixels_in_current_block_row - block_x * (B * block_height);
+        if debug { println!("i_in_block {}", i_in_block); }
+
+		let x = (i_in_block % block_width + block_x * B) as u32;
+        let y = (i_in_block / block_width + block_y * B) as u32;*/
+
+        let x = (i % width) as u32;
+        let y = (i / width) as u32;
+
+        self.i += 1;
+
+        if debug {
+            println!("({:02},{:02})", x, y);
+            println!("");
+        }
+
+        if y < self.dimensions.1 as u32 {
+            Some((x, y))
+        }
+        else {
+            None
+        }
+	}
+
+}
+
+
+pub fn try_get_pixel(prev_xy : (i64, i64), prev_image : &image::RgbaImage) -> Option<image::Rgba<u8>>
+{
+    let prev_x = prev_xy.0; //original_pixel_xy.0 + prev_x_offset;
+    let prev_y = prev_xy.1; //original_pixel_xy.1 + prev_y_offset;
+
+    if prev_x < 0 || prev_y < 0 || prev_x >= prev_image.width() as i64 || prev_y >= prev_image.height() as i64 {
+        return None;
+    }
+
+    return Some(*prev_image.get_pixel(prev_x as u32, prev_y as u32));
 }

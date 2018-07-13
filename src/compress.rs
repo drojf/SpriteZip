@@ -26,6 +26,9 @@ use common::u64_to_u8_buf_little_endian;
 use common::save_image_no_alpha;
 use common::{FILE_FORMAT_HEADER_LENGTH, BROTLI_BUFFER_SIZE};
 use common::{convert_pixel_based_to_channel_based, compress_image_to_buffer, compress_buffer};
+use common::get_offset_to_other_image;
+use common::BlockXYIterator;
+use common::try_get_pixel;
 
 struct CroppedImageBounds {
     x : u32,
@@ -247,97 +250,34 @@ type Item = (walkdir::DirEntry);
 }
 
 
-struct BlockImageIterator<'s> {
+
+pub struct BlockImageIterator<'s> {
     original_image : &'s image::RgbaImage,
-    block_size : usize,
-    i : usize,
+    xy_iter : BlockXYIterator,
 }
 
 impl<'s> BlockImageIterator<'s> {
     fn new(original_image : &'s image::RgbaImage, block_size : usize) -> BlockImageIterator<'s>
     {
-        //let block_size = 50;
-        //let num_x_blocks = original_image.width()/block_size  + if original_image.width()  % block_size == 0 { 0 } else { 1 };
-        //let num_y_blocks = original_image.height()/block_size + if original_image.height() % block_size == 0 { 0 } else { 1 };
-
         BlockImageIterator {
             original_image,
-            block_size,
-            i : 0,
+            xy_iter : BlockXYIterator::new(block_size, (original_image.width() as usize, original_image.height() as usize)),
         }
     }
 }
 
 impl<'s> Iterator for BlockImageIterator<'s>  {
 type Item = (u32, u32, image::Rgba < u8 >);
-
 	//use this one?
 	fn next(&mut self) -> Option<Self::Item>
     {
-        let debug = false;
-
-		let B = self.block_size;
-        let i = self.i;
-        let width = self.original_image.width() as usize;
-        let height = self.original_image.height() as usize;
-		let pixels_per_block_row = B * width;
-
-        if debug { println!("i:{}", i); }
-
-		let block_y = i / pixels_per_block_row;
-		let pixels_in_previous_block_rows = block_y * pixels_per_block_row;
-		let block_height =  std::cmp::min(B, height - B * block_y);
-        if debug  { println!("block_y {} block_height {}", block_y, block_height); }
-
-		//for all rows except the last row, block_height == B.
-		//for last row, block_height = image.height() % B
-		let pixels_in_current_block_row = i - pixels_in_previous_block_rows;
-		let block_x = pixels_in_current_block_row / (B * block_height);
-        let block_width  = std::cmp::min(B, width - B * block_x);
-        if debug { println!("pixels_in_block_row  {} block_x {} block_width {}", pixels_in_current_block_row , block_x, block_width); }
-
-		//for the very last block, both block height and block width will != B
-		let i_in_block = pixels_in_current_block_row - block_x * (B * block_height);
-        if debug { println!("i_in_block {}", i_in_block); }
-
-		let x = (i_in_block % block_width + block_x * B) as u32;
-        let y = (i_in_block / block_width + block_y * B) as u32;
-
-        self.i += 1;
-
-        if debug {
-            println!("({:02},{:02})", x, y);
-            println!("");
-        }
-
-        if y < height as u32 {
-            Some((x, y, *self.original_image.get_pixel(x, y)))
-        }
-        else {
-            None
+        match self.xy_iter.next() {
+            None => None,
+            Some((x,y)) => Some((x,y, *self.original_image.get_pixel(x, y))),
         }
 	}
-
 }
 
-pub fn get_offset_to_other_image(original_image : &image::RgbaImage, prev_image : &image::RgbaImage) -> (i64, i64)
-{
-    let prev_x_offset = (prev_image.width() as i64 - original_image.width()  as i64)/2;
-    let prev_y_offset = prev_image.height() as i64 - original_image.height() as i64;
-    (prev_x_offset, prev_y_offset)
-}
-
-pub fn try_get_pixel(prev_xy : (i64, i64), prev_image : &image::RgbaImage) -> Option<image::Rgba<u8>>
-{
-    let prev_x = prev_xy.0; //original_pixel_xy.0 + prev_x_offset;
-    let prev_y = prev_xy.1; //original_pixel_xy.1 + prev_y_offset;
-
-    if prev_x < 0 || prev_y < 0 || prev_x >= prev_image.width() as i64 || prev_y >= prev_image.height() as i64 {
-        return None;
-    }
-
-    return Some(*prev_image.get_pixel(prev_x as u32, prev_y as u32));
-}
 
 //new image format:
 // format 1
@@ -476,22 +416,51 @@ pub fn alt_compression_3_inner<'s,T,V>(original_image : &image::RgbaImage, prev_
 where T: std::io::Write,
       V: std::io::Write
 {
+    let (x_offset_to_other_image , y_offset_to_other_image)= get_offset_to_other_image(original_image, prev_image);
+
+    // ----------------------------  DO CROP  ----------------------------
     let mut cropper = Cropper::new((original_image.width(), original_image.height()));
-
-    let (x_offset_to_other_image, y_offset_to_other_image) = get_offset_to_other_image(original_image, prev_image);
-
     let mut debug_difference_count = 0;
-    let mut difference : Vec<u8> = Vec::with_capacity(original_image.width() as usize * original_image.height() as usize);
-
-    for (x,y,original_image_pixel) in BlockImageIterator::new(&original_image, 50)
+    for (x, y, original_image_pixel) in original_image.enumerate_pixels()
     {
-        let original_image_pixel = *original_image.get_pixel(x, y);
         let prev_x = (x as i64 + x_offset_to_other_image);
         let prev_y = (y as i64 + y_offset_to_other_image);
 
         let pixels_equal = match try_get_pixel((prev_x, prev_y), &prev_image) {
             None => false,
-            Some(prev_pixel) => original_image_pixel == prev_pixel,
+            Some(prev_pixel) => *original_image_pixel == prev_pixel,
+        };
+
+        if !pixels_equal {
+            cropper.add_nonzero_pixel(x, y);
+            debug_difference_count += 1;
+        }
+    }
+
+    //Get a cropped version of the image to work on
+    let crop_region = cropper.get_crop_region();
+    println!("Images are {} identical. {:?}", pretty_print_percent(debug_difference_count, original_image.width() as u64 * original_image.height() as u64), crop_region);
+
+    let cropped_image = image::imageops::crop(&mut original_image.clone(),
+    crop_region.top_left.0, crop_region.top_left.1,
+    crop_region.dimensions.0, crop_region.dimensions.1).to_image();
+
+    println!("Actual image dimensions (should match) {} {} num pixels {}", cropped_image.width(), cropped_image.height(), cropped_image.width() * cropped_image.height());
+
+    // ----------------------------  DO COMPRESS  ----------------------------
+    let mut debug_difference_count = 0;
+    let mut difference : Vec<u8> = Vec::with_capacity(cropped_image.width() as usize * cropped_image.height() as usize);
+
+    for (x,y,cropped_pixel) in BlockImageIterator::new(&cropped_image, 50)
+    {
+        let original_image_x = x + crop_region.top_left.0;
+        let original_image_y = y + crop_region.top_left.1;
+        let prev_x = original_image_x as i64 + x_offset_to_other_image;
+        let prev_y = original_image_y as i64 + y_offset_to_other_image;
+
+        let pixels_equal = match try_get_pixel((prev_x, prev_y), &prev_image) {
+            None => false,
+            Some(prev_pixel) => cropped_pixel == prev_pixel,
         };
 
         if pixels_equal {
@@ -500,22 +469,13 @@ where T: std::io::Write,
         }
         else {
             difference.push(1u8);
-            image_compressor.write(&original_image_pixel.data);
-            cropper.add_nonzero_pixel(x,y);
+            image_compressor.write(&cropped_pixel.data);
         }
     }
 
-    //crop the difference map
-    let crop_region = cropper.get_crop_region();
-    println!("Images are {} identical. {:?}", pretty_print_percent(debug_difference_count, original_image.width() as u64 * original_image.height() as u64), crop_region);
-    let mut difference_cropped = Vec::with_capacity(crop_region.dimensions.0 as usize * crop_region.dimensions.1 as usize);
-    for y in 0..crop_region.dimensions.1 as usize {
-        for x in 0..crop_region.dimensions.0 as usize {
-            difference_cropped.push(difference[x + y * original_image.width() as usize]);
-        }
-    }
+    println!("bitmap difference size is {}", difference.len());
 
-    bitmap_compressor.write(&difference_cropped);
+    bitmap_compressor.write(&difference);
 
     //return crop_region to be saved as metadata
     return crop_region

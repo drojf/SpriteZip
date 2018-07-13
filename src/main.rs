@@ -31,7 +31,7 @@ extern crate time;
 //custom modules
 use alphablend::convert_folder_to_alphablend;
 use compress::{compress_path, block_compression_test,alt_compression, alt_compression_2};
-use extract::extract_archive;
+use extract::{extract_archive, extract_archive_alt};
 use common::verify_images;
 
 //standard uses
@@ -69,7 +69,8 @@ fn main()
     if do_brotli_extract
     {
         println!("\n\n ---------- Begin Extraction... ---------- ");
-        extract_archive(&brotli_archive_path, false, false);
+        //extract_archive(&brotli_archive_path, false, false);
+        extract_archive_alt(&brotli_archive_path, false);
     }
 
     if do_brotli_verify
