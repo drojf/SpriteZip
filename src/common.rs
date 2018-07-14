@@ -294,6 +294,28 @@ impl BlockXYIterator {
     }
 }
 
+
+
+/*
+#[allow(unused_imports)]
+use common::BlockXYIterator;
+#[allow(unused_imports)]
+use image::RgbaImage;
+
+
+  test for iterator
+
+  let im = RgbaImage::new(3,5);
+    let mut count = 0;
+   for (x,y) in BlockXYIterator::new(2, (3, 5)) {
+       count += 1;
+       let pix = im.get_pixel(x,y);
+       println!("x: {} y:{} {:?} {}", x,y, pix, count);
+    }
+
+
+    return;
+*/
 impl Iterator for BlockXYIterator {
 type Item = (u32, u32);
 

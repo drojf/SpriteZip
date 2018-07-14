@@ -38,73 +38,92 @@ use common::verify_images;
 use std::path::{Path};
 use std::env;
 
-#[allow(unused_imports)]
-use common::BlockXYIterator;
-#[allow(unused_imports)]
-use image::RgbaImage;
+//TODO: take input/output folders as arguments
+fn do_compression(brotli_archive_path : &str)
+{
+    println!("\n\n ---------- Begin Compression... ---------- ");
+    alt_compression_2(&brotli_archive_path);
+}
+
+//TODO: take input/output folders as arguments
+fn do_extraction(brotli_archive_path : &str)
+{
+    println!("\n\n ---------- Begin Extraction... ---------- ");
+    if !Path::new(brotli_archive_path).exists() {
+        println!("ERROR: Archive file [{}] does not exist! exiting...", brotli_archive_path);
+        std::process::exit(-1);
+    }
+    extract_archive_alt(&brotli_archive_path, false);
+}
+
+fn do_verify(input_folder: &str, output_folder: &str)
+{
+    println!("\n\n ---------- Begin Verification... ---------- ");
+    println!("Verification Result: {}",
+        if verify_images(input_folder, output_folder) {"SUCCESS"} else {"FAILURE"}
+    );
+}
+
+fn do_alphablend()
+{
+    let num_converted = convert_folder_to_alphablend();
+    if num_converted == 0
+    {
+        println!("Please place .png files/folders in the 'input_images' directory. They will be converted and placed in the 'output_images' directory.");
+        return;
+    }
+}
 
 fn main()
 {
-  /*   let im = RgbaImage::new(3,5);
-    let mut count = 0;
-   for (x,y) in BlockXYIterator::new(2, (3, 5)) {
-       count += 1;
-       let pix = im.get_pixel(x,y);
-       println!("x: {} y:{} {:?} {}", x,y, pix, count);
-    }
+    let input_folder = "input_images";
+    let output_folder = "output_images";
+    let brotli_archive_path = "compressed_images.brotli";
 
-
-    return;
-*/
-    //Use command line arguments to set program mode
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 { println!("Not enough arguments! Please run as 'spritezip [compress|extract|verify|selftest|alphablend]'"); return; }
-
-    let mode = &args[1];
-    let do_brotli_compression       = mode == "selftest" || mode == "compress"; //compresses the input folder into a .brotli file
-    let do_brotli_extract           = mode == "selftest" || mode == "extract" ; //extracts the .brotli file to the output folder
-    let do_brotli_verify            = mode == "selftest" || mode == "verify";   //verifies the input images are identical to the output images (does not check for extra images in output folder)
-    let do_onscripter_alphablend    = mode == "alphablend";                     //converts images to nscripter alphablend format from the input folder to the output folder
+    println!("Spritezip version 0.1\n");
 
     //create input images folder if it doesn't already exist:
-    let input_path = Path::new("input_images");
+    let input_path = Path::new(input_folder);
     std::fs::create_dir_all(input_path).unwrap();
 
-    let output_basename = "compressed_images";
-    let brotli_archive_path = format!("{}.brotli", output_basename);
+    //check if the output folder already exists
+    let output_folder_exists = Path::new(output_folder).exists();
 
-    //TODO: in selftest mode, don't run if output directory is not clear (incase 'correct' images are already in output directory)
-    //         alternatively just rename or delete the output directory.
+    //Use command line arguments to set program mode
+    let args: Vec<String> = env::args().collect();
+    let mode = if args.len() < 2 {
+        None
+    } else {
+        Some(args[1].as_ref())
+    };
 
-    if do_brotli_compression
-    {
-        println!("\n\n ---------- Begin Compression... ---------- ");
-        alt_compression_2(&brotli_archive_path);
-    }
+    match mode {
+        Some("compress") => {
+            //TODO: compression produces an output file, even if input images directory is empty
+            do_compression(brotli_archive_path);
+        },
+        Some("extract") | None => {
+            if mode == None {
+                println!("No arguments supplied - will try to extract the default archive [{}]...", brotli_archive_path);
+            }
+            do_extraction(brotli_archive_path);
+        },
+        Some("selftest") => {
+            if output_folder_exists {
+                println!("ERROR: Can't run Self Test because output folder already exists!");
+                println!("Please delete the folder [{}] as it may already contain 'correct' files, giving a false test result", output_folder);
+                std::process::exit(-1);
+            }
 
-    if do_brotli_extract
-    {
-        println!("\n\n ---------- Begin Extraction... ---------- ");
-        extract_archive_alt(&brotli_archive_path, false);
-    }
-
-    if do_brotli_verify
-    {
-        println!("\n\n ---------- Begin Verification... ---------- ");
-        println!("Verification Result: {}",
-            if verify_images("input_images", "output_images") {"SUCCESS"} else {"FAILURE"}
-        );
-    }
-
-    if do_onscripter_alphablend
-    {
-        let num_converted = convert_folder_to_alphablend();
-
-        if num_converted == 0
-        {
-            println!("Please place .png files/folders in the 'input_images' directory. They will be converted and placed in the 'output_images' directory.");
-            return;
+            do_compression(brotli_archive_path);
+            do_extraction(brotli_archive_path);
+            do_verify(input_folder, output_folder);
+        },
+        Some("alphablend") => {
+            do_alphablend();
+        },
+        Some(_) => {
+            println!("Invalid argument Please run as 'spritezip [compress|extract|verify|selftest|alphablend]'");
         }
-
     }
 }
