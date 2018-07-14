@@ -48,14 +48,14 @@ fn do_compression(brotli_archive_path : &str)
 }
 
 //TODO: take input/output folders as arguments
-fn do_extraction(brotli_archive_path : &str, optimize : bool )
+fn do_extraction(brotli_archive_path : &str, optimize_level : Option<u8> )
 {
     println!("\n\n ---------- Begin Extraction... ---------- ");
     if !Path::new(brotli_archive_path).exists() {
         println!("ERROR: Archive file [{}] does not exist! exiting...", brotli_archive_path);
         std::process::exit(-1);
     }
-    extract_archive_alt(&brotli_archive_path, optimize, false, );
+    extract_archive_alt(&brotli_archive_path, optimize_level, false, );
 }
 
 fn do_verify(input_folder: &str, output_folder: &str)
@@ -76,6 +76,16 @@ fn do_alphablend()
     }
 }
 
+fn print_description_and_exit() -> !
+{
+    println!("\n------------------------------- Usage Instructions -------------------------------------");
+    println!("spritezip [compress|extract [0|1|2|3|4|5|6]|verify|selftest|alphablend]");
+    println!("If you use 'spritezip extract' by itself, .png files are not optimized");
+    println!("Specifying a number (2 is recommended) will cause oxipng to optimize the .png files before saving them.");
+    println!("For example 'spritezip extract 2' will use level 2 compression (where 0 is fast and largest size, 6 is extremely slow and smallest size)");
+    std::process::exit(-1);
+}
+
 fn main()
 {
     let input_folder = "input_images";
@@ -91,6 +101,7 @@ fn main()
     //check if the output folder already exists
     let output_folder_exists = Path::new(output_folder).exists();
 
+    //TODO: use 'clap' to parse arugments
     //Use command line arguments to set program mode
     let args: Vec<String> = env::args().collect();
     let mode = if args.len() < 2 {
@@ -99,17 +110,24 @@ fn main()
         Some(args[1].as_ref())
     };
 
-    let optimize = if args.len() < 3 {
-        false
+    //get oxipng optimization level
+    let optimize_level = if args.len() < 3 {
+        println!("INFO: 'optimize' argument NOT given - PNG files will not be optimized for size when extracting!");
+        None
     } else {
-        &args[2] == "optimize"
+        match args[2].parse::<u8>() {
+            Ok(value) => {
+                println!("INFO: optimize level [{}] given - PNG files will be optimized for size when extracting", value);
+                println!("INFO: Note: optimization levels are from 0 (fast, low comp) to 6 (slow, high comp). Level 2 is recommended. Values higher than 6 will be the same as level 6");
+                println!("See the oxipng documentation for more details.");
+                Some(value)
+            },
+            Err(e) => {
+                println!("ERROR: Invalid value for {} 'optimization' argument (reason: {}) - exiting", &args[2], e.to_string());
+                print_description_and_exit();
+            },
+        }
     };
-
-    if optimize {
-        println!("INFO: 'optimize' argument given - PNG files will be optimized for size when extracting");
-    } else {
-        println!("INFO: 'optimize' argument NOT given - PNG files will not be optimized for size when extracting!")
-    }
 
     match mode {
         Some("compress") => {
@@ -120,24 +138,27 @@ fn main()
             if mode == None {
                 println!("No arguments supplied - will try to extract the default archive [{}]...", brotli_archive_path);
             }
-            do_extraction(brotli_archive_path, optimize);
+            do_extraction(brotli_archive_path, optimize_level);
         },
+        Some("verify") => {
+            do_verify(input_folder, output_folder);
+        }
         Some("selftest") => {
             if output_folder_exists {
                 println!("ERROR: Can't run Self Test because output folder already exists!");
                 println!("Please delete the folder [{}] as it may already contain 'correct' files, giving a false test result", output_folder);
-                std::process::exit(-1);
+                print_description_and_exit();
             }
 
             do_compression(brotli_archive_path);
-            do_extraction(brotli_archive_path, optimize);
+            do_extraction(brotli_archive_path, optimize_level);
             do_verify(input_folder, output_folder);
         },
         Some("alphablend") => {
             do_alphablend();
         },
         Some(_) => {
-            println!("Invalid argument Please run as 'spritezip [compress|extract|verify|selftest|alphablend]'");
+            print_description_and_exit();
         }
     }
 }

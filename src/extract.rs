@@ -20,7 +20,7 @@ use common::get_offset_to_other_image;
 use common::BlockXYIterator;
 use common::try_get_pixel;
 
-pub fn extract_archive_alt(brotli_archive_path : &str, optimize : bool, debug_mode : bool) {
+pub fn extract_archive_alt(brotli_archive_path : &str, optimize_level : Option<u8>, debug_mode : bool) {
     //open the brotli file for reading
     let mut brotli_file = fs::File::open(brotli_archive_path).unwrap();
 
@@ -121,29 +121,32 @@ pub fn extract_archive_alt(brotli_archive_path : &str, optimize : bool, debug_mo
         //create the folder(s) to put the image in, then save the image
         let output_image_path = Path::new("output_images").join(&metadata.output_path);
         fs::create_dir_all(output_image_path.parent().unwrap()).unwrap();
-        if optimize {
-            //TODO: oxipng doesn't seem to accept raw images - only png images.
-            //      in the future see if accept raw images, to avoid double compression/decompression
-            let mut unoptimized_png_in_memory = Vec::new(); //TODO:at least size of current image - prevent reallocation
-            {
-                let ref mut w = std::io::BufWriter::new(&mut unoptimized_png_in_memory);
-                let mut encoder = png::Encoder::new(w, full_image.width(), full_image.height()); // Width is 2 pixels and height is 1.
-                encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
-                let mut writer = encoder.write_header().unwrap();
 
-                writer.write_image_data(&full_image.clone().into_raw()).unwrap(); // Save
-            }
+        match optimize_level {
+            None => full_image.save(output_image_path).unwrap(),
+            Some(optimize_level) => {
+                //TODO: oxipng doesn't seem to accept raw images - only png images.
+                //      in the future see if accept raw images, to avoid double compression/decompression
+                let mut unoptimized_png_in_memory = Vec::new(); //TODO:at least size of current image - prevent reallocation
+                {
+                    let ref mut w = std::io::BufWriter::new(&mut unoptimized_png_in_memory);
+                    let mut encoder = png::Encoder::new(w, full_image.width(), full_image.height()); // Width is 2 pixels and height is 1.
+                    encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
+                    let mut writer = encoder.write_header().unwrap();
 
-            //Now pass the .png file to oxipng
-            let options = oxipng::Options {
-                ..Default::default()
-            };
+                    writer.write_image_data(&full_image.clone().into_raw()).unwrap(); // Save
+                }
 
-            let optimized_png = oxipng::optimize_from_memory(&unoptimized_png_in_memory[..], &options).unwrap();
-            std::fs::write(&output_image_path, &optimized_png[..]);
-        }
-        else {
-            full_image.save(output_image_path).unwrap();
+                //Now pass the .png file to oxipng
+                /*let options = oxipng::Options {
+                    ..Default::default()
+                }; //use apply_preset_2  apply_preset_1 etc*/
+
+                let options = oxipng::Options::from_preset(optimize_level);
+
+                let optimized_png = oxipng::optimize_from_memory(&unoptimized_png_in_memory[..], &options).unwrap();
+                std::fs::write(&output_image_path, &optimized_png[..]);
+            },
         }
 
         prev_image = full_image;
