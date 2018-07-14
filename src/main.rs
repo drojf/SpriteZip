@@ -49,14 +49,14 @@ fn do_compression(brotli_archive_path : &str)
 }
 
 //TODO: take input/output folders as arguments
-fn do_extraction(brotli_archive_path : &str, oxipng_options : Option<oxipng::Options> )
+fn do_extraction(brotli_archive_path : &str, oxipng_options : Option<oxipng::Options>, debug_mode : bool)
 {
     println!("\n\n ---------- Begin Extraction... ---------- ");
     if !Path::new(brotli_archive_path).exists() {
         println!("ERROR: Archive file [{}] does not exist! exiting...", brotli_archive_path);
         std::process::exit(-1);
     }
-    extract_archive_alt(&brotli_archive_path, oxipng_options, false, );
+    extract_archive_alt(&brotli_archive_path, oxipng_options, debug_mode);
 }
 
 fn do_verify(input_folder: &str, output_folder: &str)
@@ -98,7 +98,7 @@ fn main()
     let output_folder = "output_images";
     let brotli_archive_path = "compressed_images.brotli";
 
-    println!("Spritezip version 0.1\n");
+    println!("Spritezip version 0.1.1\n");
 
     //create input images folder if it doesn't already exist:
     let input_path = Path::new(input_folder);
@@ -110,6 +110,15 @@ fn main()
     //TODO: use 'clap' to parse arugments
     //Use command line arguments to set program mode
     let args: Vec<String> = env::args().collect();
+
+    //set debug mode if 'debug' in argument list
+    let mut debug_mode = false;
+    for s in &args {
+        if s == "debug" {
+            debug_mode = true;
+        }
+    }
+
     let mode = if args.len() < 2 {
         None
     } else {
@@ -117,23 +126,35 @@ fn main()
     };
 
     //get oxipng optimization level
-    let oxipng_options = if args.len() < 3 {
-        println!("INFO: 'optimize' argument NOT given - PNG files will not be optimized for size when extracting!");
-        None
-    } else {
-        match args[2].parse::<u8>() {
-            Ok(optimization_level) => {
-                println!("INFO: optimize level [{}] given - PNG files will be optimized for size when extracting", optimization_level);
-                println!("INFO: Note: optimization levels are from 0 (fast, low comp) to 6 (slow, high comp). Level 2 is recommended. Values higher than 6 will be the same as level 6");
-                println!("See the oxipng documentation for more details.");
-                Some(oxipng::Options::from_preset(optimization_level))
-            },
-            Err(e) => {
-                println!("ERROR: Invalid value for {} 'optimization' argument (reason: {}) - exiting", &args[2], e.to_string());
-                print_description_and_exit();
-            },
+    let oxipng_options = if mode != Some("extract") {
+            None
         }
-    };
+        else if args.len() < 3 {
+            println!("INFO: 'optimize' argument NOT given - PNG files will not be optimized for size when extracting!");
+            None
+        } else {
+            match args[2].parse::<u8>() {
+                Ok(optimization_level) => {
+                    println!("INFO: optimize level [{}] given - PNG files will be optimized for size when extracting", optimization_level);
+                    println!("INFO: Note: optimization levels are from 0 (fast, low comp) to 6 (slow, high comp). Level 2 is recommended. Values higher than 6 will be the same as level 6");
+                    println!("See the oxipng documentation for more details.");
+                    let mut oxipng_options = oxipng::Options::from_preset(optimization_level);
+                    oxipng_options.verbosity = if debug_mode { Some(0) } else { None }; //supress oxipng printing unless in debug mode
+                    oxipng_options.interlace = Some(0);                                 //remove any interlacing from image
+                    //don't try to change bit depth/color type/palette in case it breaks the game where the sprite is used
+                    oxipng_options.bit_depth_reduction = false;
+                    oxipng_options.color_type_reduction = false;
+                    oxipng_options.palette_reduction = false;
+                    Some(oxipng_options)
+                },
+                Err(e) => {
+                    //TODO: if you specify 'debug' with no oxipng level, it will show this error!
+                    println!("ERROR: Invalid value for {} 'optimization' argument (reason: {}) - exiting", &args[2], e.to_string());
+                    print_description_and_exit();
+                },
+            }
+        };
+
 
     match mode {
         Some("compress") => {
@@ -144,7 +165,7 @@ fn main()
             if mode == None {
                 println!("No arguments supplied - will try to extract the default archive [{}]...", brotli_archive_path);
             }
-            do_extraction(brotli_archive_path, oxipng_options);
+            do_extraction(brotli_archive_path, oxipng_options, debug_mode);
         },
         Some("verify") => {
             do_verify(input_folder, output_folder);
@@ -157,7 +178,7 @@ fn main()
             }
 
             do_compression(brotli_archive_path);
-            do_extraction(brotli_archive_path, oxipng_options);
+            do_extraction(brotli_archive_path, oxipng_options, debug_mode);
             do_verify(input_folder, output_folder);
         },
         Some("alphablend") => {
