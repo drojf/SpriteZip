@@ -1,6 +1,8 @@
 use image;
 use image::RgbaImage;
-use walkdir::WalkDir;
+
+use walkdir;
+
 use std;
 use std::path::Path;
 use std::fs::File;
@@ -74,16 +76,63 @@ pub fn pretty_print_percent(numerator: u64, denominator: u64) -> String
 //    format!("{}%", numerator_as_float / denominator_as_float * 100.0)
 //}
 
-pub fn verify_images(input_folder : &str, output_folder : &str) -> bool
+
+pub struct FileTypeIterator<'s> {
+    walkdir_iterator : walkdir::IntoIter,
+    file_type : &'s str,
+}
+
+impl<'s> FileTypeIterator<'s> {
+    pub fn new(root : &'s str, file_type : &'s str) -> FileTypeIterator<'s>
+    {
+        FileTypeIterator {
+            walkdir_iterator : walkdir::WalkDir::new(root).into_iter(),
+            file_type : file_type,
+        }
+    }
+}
+
+impl<'s> Iterator for FileTypeIterator<'s>  {
+type Item = (walkdir::DirEntry);
+	fn next(&mut self) -> Option<Self::Item>
+    {
+        loop {
+            let entry = match self.walkdir_iterator.next() {
+                None => return None,
+                Some(ent) => ent.unwrap(),
+            };
+
+            let is_file = entry.file_type().is_file();
+
+            let extension_matches = match entry.path().extension() {
+                None => false,
+                Some(ext) => ext == self.file_type,
+            };
+
+            if is_file && extension_matches {
+                return Some(entry);
+            }
+            else
+            {
+                continue
+            }
+        }
+	}
+}
+
+pub enum VerificationResult {
+    ExactMatch,     //images match exactly
+    InvisibleMatch, //images match, except for pixels whose alpha values are 0
+    Failure,         //images do not match
+    NotFound,
+}
+
+pub fn verify_images(input_folder : &str, output_folder : &str) -> VerificationResult
 {
     //iterate over each image in input folder
-    for entry in WalkDir::new(input_folder)
+    let mut invisible_error = false;
+    for (img_count, ent) in FileTypeIterator::new(input_folder, "png").enumerate()
     {
-        let ent = entry.unwrap();
-        if ent.file_type().is_dir() {
-            continue;
-        }
-
         //load input and output images
         let input_image_raw = image::open(ent.path()).unwrap().raw_pixels();
 
@@ -96,24 +145,47 @@ pub fn verify_images(input_folder : &str, output_folder : &str) -> bool
 
                 println!("Comparing '{}' against '{}'...", ent.path().to_str().unwrap(), output_folder_image_path.to_str().unwrap());
 
-                //compare the raw buffer representation of each and verify each byte matches
-                for (input_b, output_b) in input_image_raw.iter().zip(output_image_raw.iter())
+                //TODO: don't use this silly array indexing...
+                let mut invisible_pixel_found = false;
+                for pixel_i in 0..input_image_raw.len()/4
                 {
-                    if input_b != output_b {
-                        println!("Error: image {} does not match!", ent.path().to_str().unwrap());
-                        return false;
+                    let i = pixel_i * 4;
+                    let input_pixel = &input_image_raw[i..i + 4];
+                    let output_pixel = &output_image_raw[i..i + 4];
+
+                    if input_pixel != output_pixel {
+                        //if both pixel's alpha values are 0, mark as invisible pixel
+                        if (input_pixel[3]) == 0 && (output_pixel[3] == 0) {
+                            invisible_pixel_found = true;
+                        }
+                        else
+                        {
+                            //found a really wrong pixel, just exit immediately
+                            println!("Error: image {} does not match (true error)!", ent.path().to_str().unwrap());
+                            println!("{:?} != {:?}", input_pixel, output_pixel);
+                            return VerificationResult::Failure;
+                        }
                     }
                 }
-            }
+
+                if invisible_pixel_found {
+                    println!("WARNING: invisible pixel found");
+                    invisible_error = true;
+                }
+             }
 
             Err(e) => {
-                println!("Error: corresponding output image can't be opened or doesn't exist! {:?}", e);
-                return false;
+                println!("{}", e.to_string());
+                return VerificationResult::NotFound;
             }
         }
     }
 
-    return true;
+    if invisible_error {
+        return VerificationResult::InvisibleMatch;
+    }
+
+    return VerificationResult::ExactMatch;
 }
 
 pub fn get_byte_of_u64(value : u64, which_byte : usize) -> u8
@@ -194,7 +266,7 @@ pub fn scan_folder_for_max_png_size(input_folder : &str) -> (u32, u32)
     let mut max_width = 0;
     let mut max_height = 0;
     //iterate over each image in input folder
-    for entry in WalkDir::new(input_folder)
+    for entry in walkdir::WalkDir::new(input_folder)
     {
         let ent = entry.unwrap();
         if ent.file_type().is_dir() {

@@ -35,6 +35,7 @@ use alphablend::convert_folder_to_alphablend;
 use compress::alt_compression_2;
 use extract::extract_archive_alt;
 use common::verify_images;
+use common::VerificationResult;
 
 //standard uses
 use std::path::{Path};
@@ -48,22 +49,27 @@ fn do_compression(brotli_archive_path : &str)
 }
 
 //TODO: take input/output folders as arguments
-fn do_extraction(brotli_archive_path : &str, optimize_level : Option<u8> )
+fn do_extraction(brotli_archive_path : &str, oxipng_options : Option<oxipng::Options> )
 {
     println!("\n\n ---------- Begin Extraction... ---------- ");
     if !Path::new(brotli_archive_path).exists() {
         println!("ERROR: Archive file [{}] does not exist! exiting...", brotli_archive_path);
         std::process::exit(-1);
     }
-    extract_archive_alt(&brotli_archive_path, optimize_level, false, );
+    extract_archive_alt(&brotli_archive_path, oxipng_options, false, );
 }
 
 fn do_verify(input_folder: &str, output_folder: &str)
 {
     println!("\n\n ---------- Begin Verification... ---------- ");
-    println!("Verification Result: {}",
-        if verify_images(input_folder, output_folder) {"SUCCESS"} else {"FAILURE"}
-    );
+    println!("Verification Result:");
+
+    match verify_images(input_folder, output_folder) {
+        VerificationResult::ExactMatch => println!("All images match exactly!"),
+        VerificationResult::InvisibleMatch => println!("Warning - some pixels had invisible pixels with different values. They might have been optimized away by oxipng!"),
+        VerificationResult::Failure => println!("Error: at least one image did not match!"),
+        VerificationResult::NotFound => println!("Error: corresponding output image can't be opened or doesn't exist!"),
+    }
 }
 
 fn do_alphablend()
@@ -111,16 +117,16 @@ fn main()
     };
 
     //get oxipng optimization level
-    let optimize_level = if args.len() < 3 {
+    let oxipng_options = if args.len() < 3 {
         println!("INFO: 'optimize' argument NOT given - PNG files will not be optimized for size when extracting!");
         None
     } else {
         match args[2].parse::<u8>() {
-            Ok(value) => {
-                println!("INFO: optimize level [{}] given - PNG files will be optimized for size when extracting", value);
+            Ok(optimization_level) => {
+                println!("INFO: optimize level [{}] given - PNG files will be optimized for size when extracting", optimization_level);
                 println!("INFO: Note: optimization levels are from 0 (fast, low comp) to 6 (slow, high comp). Level 2 is recommended. Values higher than 6 will be the same as level 6");
                 println!("See the oxipng documentation for more details.");
-                Some(value)
+                Some(oxipng::Options::from_preset(optimization_level))
             },
             Err(e) => {
                 println!("ERROR: Invalid value for {} 'optimization' argument (reason: {}) - exiting", &args[2], e.to_string());
@@ -138,7 +144,7 @@ fn main()
             if mode == None {
                 println!("No arguments supplied - will try to extract the default archive [{}]...", brotli_archive_path);
             }
-            do_extraction(brotli_archive_path, optimize_level);
+            do_extraction(brotli_archive_path, oxipng_options);
         },
         Some("verify") => {
             do_verify(input_folder, output_folder);
@@ -151,7 +157,7 @@ fn main()
             }
 
             do_compression(brotli_archive_path);
-            do_extraction(brotli_archive_path, optimize_level);
+            do_extraction(brotli_archive_path, oxipng_options);
             do_verify(input_folder, output_folder);
         },
         Some("alphablend") => {

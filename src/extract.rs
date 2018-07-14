@@ -20,7 +20,7 @@ use common::get_offset_to_other_image;
 use common::BlockXYIterator;
 use common::try_get_pixel;
 
-pub fn extract_archive_alt(brotli_archive_path : &str, optimize_level : Option<u8>, debug_mode : bool) {
+pub fn extract_archive_alt(brotli_archive_path : &str, oxipng_options : Option<oxipng::Options>, debug_mode : bool) {
     //open the brotli file for reading
     let mut brotli_file = fs::File::open(brotli_archive_path).unwrap();
 
@@ -66,17 +66,15 @@ pub fn extract_archive_alt(brotli_archive_path : &str, optimize_level : Option<u
 
     //for each image
     let mut prev_image = RgbaImage::new(0,0); //on first image iteration, this should never get accessed
-
-    for (img_count, metadata) in decompression_info.images_info.into_iter().enumerate()
+    let num_images = decompression_info.images_info.len();
+    for (img_i, metadata) in decompression_info.images_info.into_iter().enumerate()
     {
-        if debug_mode { println!("Extracting Image {} - meta: {:?}", img_count, metadata); }
-        else {
-            print!("{}: ", img_count + 1);
-            print!("diff: ({:4},{:4}) ", metadata.diff_width, metadata.diff_height);
-            print!("full: ({:4},{:4}) ", metadata.output_width, metadata.output_height);
-            print!("{}", metadata.output_path);
-            println!("");
-        }
+        print!("{}/{}: ", img_i + 1, num_images);
+        print!("diff: ({:4},{:4}) ", metadata.diff_width, metadata.diff_height);
+        print!("full: ({:4},{:4}) ", metadata.output_width, metadata.output_height);
+        print!("{}", metadata.output_path);
+        println!("");
+        if debug_mode { println!("meta: {:?}", metadata); }
 
         //take a slice which contains only the desired region
         //read out the required number of bytes
@@ -122,9 +120,9 @@ pub fn extract_archive_alt(brotli_archive_path : &str, optimize_level : Option<u
         let output_image_path = Path::new("output_images").join(&metadata.output_path);
         fs::create_dir_all(output_image_path.parent().unwrap()).unwrap();
 
-        match optimize_level {
+        match &oxipng_options {
             None => full_image.save(output_image_path).unwrap(),
-            Some(optimize_level) => {
+            Some(oxipng_options) => {
                 //TODO: oxipng doesn't seem to accept raw images - only png images.
                 //      in the future see if accept raw images, to avoid double compression/decompression
                 let mut unoptimized_png_in_memory = Vec::new(); //TODO:at least size of current image - prevent reallocation
@@ -137,15 +135,8 @@ pub fn extract_archive_alt(brotli_archive_path : &str, optimize_level : Option<u
                     writer.write_image_data(&full_image.clone().into_raw()).unwrap(); // Save
                 }
 
-                //Now pass the .png file to oxipng
-                /*let options = oxipng::Options {
-                    ..Default::default()
-                }; //use apply_preset_2  apply_preset_1 etc*/
-
-                let options = oxipng::Options::from_preset(optimize_level);
-
-                let optimized_png = oxipng::optimize_from_memory(&unoptimized_png_in_memory[..], &options).unwrap();
-                std::fs::write(&output_image_path, &optimized_png[..]);
+                let optimized_png = oxipng::optimize_from_memory(&unoptimized_png_in_memory[..], &oxipng_options).unwrap();
+                std::fs::write(&output_image_path, &optimized_png[..]).unwrap();
             },
         }
 

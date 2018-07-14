@@ -11,8 +11,6 @@ use bincode;
 
 use brotli;
 use image;
-use walkdir;
-use walkdir::WalkDir;
 
 use common::{pretty_print_bytes, pretty_print_percent};
 use common::{CompressedImageInfo, DecompressionInfo};
@@ -21,6 +19,7 @@ use common::{FILE_FORMAT_HEADER_LENGTH, BROTLI_BUFFER_SIZE};
 use common::get_offset_to_other_image;
 use common::BlockXYIterator;
 use common::try_get_pixel;
+use common::FileTypeIterator;
 
 struct CroppedImageBounds {
     x : u32,
@@ -134,48 +133,6 @@ impl Cropper {
     }
 }
 
-struct FileTypeIterator<'s> {
-    walkdir_iterator : walkdir::IntoIter,
-    file_type : &'s str,
-}
-
-impl<'s> FileTypeIterator<'s> {
-    fn new(root : &'s str, file_type : &'s str) -> FileTypeIterator<'s>
-    {
-        FileTypeIterator {
-            walkdir_iterator : WalkDir::new(root).into_iter(),
-            file_type : file_type,
-        }
-    }
-}
-
-impl<'s> Iterator for FileTypeIterator<'s>  {
-type Item = (walkdir::DirEntry);
-	fn next(&mut self) -> Option<Self::Item>
-    {
-        loop {
-            let entry = match self.walkdir_iterator.next() {
-                None => return None,
-                Some(ent) => ent.unwrap(),
-            };
-
-            let is_file = entry.file_type().is_file();
-
-            let extension_matches = match entry.path().extension() {
-                None => false,
-                Some(ext) => ext == self.file_type,
-            };
-
-            if is_file && extension_matches {
-                return Some(entry);
-            }
-            else
-            {
-                continue
-            }
-        }
-	}
-}
 
 pub struct BlockImageIterator<'s> {
     original_image : &'s image::RgbaImage,
