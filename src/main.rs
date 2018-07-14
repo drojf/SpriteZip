@@ -23,6 +23,8 @@ extern crate image;
 extern crate brotli;
 extern crate walkdir;
 extern crate number_prefix;
+extern crate oxipng;
+extern crate png;
 
 //standard crates
 extern crate core;
@@ -46,14 +48,14 @@ fn do_compression(brotli_archive_path : &str)
 }
 
 //TODO: take input/output folders as arguments
-fn do_extraction(brotli_archive_path : &str)
+fn do_extraction(brotli_archive_path : &str, optimize : bool )
 {
     println!("\n\n ---------- Begin Extraction... ---------- ");
     if !Path::new(brotli_archive_path).exists() {
         println!("ERROR: Archive file [{}] does not exist! exiting...", brotli_archive_path);
         std::process::exit(-1);
     }
-    extract_archive_alt(&brotli_archive_path, false);
+    extract_archive_alt(&brotli_archive_path, optimize, false, );
 }
 
 fn do_verify(input_folder: &str, output_folder: &str)
@@ -97,6 +99,18 @@ fn main()
         Some(args[1].as_ref())
     };
 
+    let optimize = if args.len() < 3 {
+        false
+    } else {
+        &args[2] == "optimize"
+    };
+
+    if optimize {
+        println!("INFO: 'optimize' argument given - PNG files will be optimized for size when extracting");
+    } else {
+        println!("INFO: 'optimize' argument NOT given - PNG files will not be optimized for size when extracting!")
+    }
+
     match mode {
         Some("compress") => {
             //TODO: compression produces an output file, even if input images directory is empty
@@ -106,7 +120,7 @@ fn main()
             if mode == None {
                 println!("No arguments supplied - will try to extract the default archive [{}]...", brotli_archive_path);
             }
-            do_extraction(brotli_archive_path);
+            do_extraction(brotli_archive_path, optimize);
         },
         Some("selftest") => {
             if output_folder_exists {
@@ -116,7 +130,7 @@ fn main()
             }
 
             do_compression(brotli_archive_path);
-            do_extraction(brotli_archive_path);
+            do_extraction(brotli_archive_path, optimize);
             do_verify(input_folder, output_folder);
         },
         Some("alphablend") => {
