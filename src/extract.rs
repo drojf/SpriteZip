@@ -74,11 +74,11 @@ pub fn extract_archive_alt(brotli_archive_path : &str, oxipng_options : Option<o
         print!("full: ({:4},{:4}) ", metadata.output_width, metadata.output_height);
         print!("{}", metadata.output_path);
         println!("");
-        if debug_mode { println!("meta: {:?}", metadata); }
 
         //take a slice which contains only the desired region
         //read out the required number of bytes
         let expected_cropped_bitmap_size = metadata.diff_width as usize * metadata.diff_height as usize;
+        if debug_mode { println!("meta: {:?}", metadata); println!("Trying to extract {} bytes of bitmap data", expected_cropped_bitmap_size)}
 
         let mut cropped_bitmap = vec![0u8; expected_cropped_bitmap_size];
         bitmap_info_decompressor.read_exact(&mut cropped_bitmap).unwrap();

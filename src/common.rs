@@ -353,41 +353,29 @@ pub struct BlockXYIterator {
 impl BlockXYIterator {
     pub fn new(block_size : usize, dimensions : (usize, usize)) -> BlockXYIterator
     {
-        let num_x_blocks = dimensions.0 / block_size + if dimensions.0 % block_size == 0 {0} else {1};
-        let num_y_blocks = dimensions.1 / block_size + if dimensions.1 % block_size == 0 {0} else {1};
+        let mut safe_dimensions = dimensions;
+        let mut safe_i = 0;
+
+        // if dimensions given are 0,0, force dimensions to 1,1, then set i so that iterator
+        // will terminate immediately. This avoids a modulo (%) by zero error and does 0 iterations.
+        if dimensions.0 == 0 || dimensions.1 == 0 {
+            safe_dimensions = (1, 1);
+            safe_i = 2;
+        }
+
+        let num_x_blocks = safe_dimensions.0 / block_size + if safe_dimensions.0 % block_size == 0 {0} else {1};
+        let num_y_blocks = safe_dimensions.1 / block_size + if safe_dimensions.1 % block_size == 0 {0} else {1};
 
         BlockXYIterator {
             block_size,
-            dimensions,
+            dimensions : safe_dimensions,
             num_x_blocks,
             num_y_blocks,
-            i : 0,
+            i : safe_i,
         }
     }
 }
 
-
-
-/*
-#[allow(unused_imports)]
-use common::BlockXYIterator;
-#[allow(unused_imports)]
-use image::RgbaImage;
-
-
-  test for iterator
-
-  let im = RgbaImage::new(3,5);
-    let mut count = 0;
-   for (x,y) in BlockXYIterator::new(2, (3, 5)) {
-       count += 1;
-       let pix = im.get_pixel(x,y);
-       println!("x: {} y:{} {:?} {}", x,y, pix, count);
-    }
-
-
-    return;
-*/
 impl Iterator for BlockXYIterator {
 type Item = (u32, u32);
 
@@ -435,6 +423,36 @@ type Item = (u32, u32);
         }
     }
 }
+
+
+
+
+/*
+Tests for xy iterator
+
+//test iterating (50, width = 0, height = 0)
+//test odd/even pixel width
+//test images equal exactly the block width, and not equal to block width
+
+#[allow(unused_imports)]
+use common::BlockXYIterator;
+#[allow(unused_imports)]
+use image::RgbaImage;
+
+
+  test for iterator
+
+  let im = RgbaImage::new(3,5);
+    let mut count = 0;
+   for (x,y) in BlockXYIterator::new(2, (3, 5)) {
+       count += 1;
+       let pix = im.get_pixel(x,y);
+       println!("x: {} y:{} {:?} {}", x,y, pix, count);
+    }
+
+
+    return;
+*/
 
 
 pub fn try_get_pixel(prev_xy : (i64, i64), prev_image : &image::RgbaImage) -> Option<image::Rgba<u8>>

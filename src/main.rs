@@ -98,7 +98,7 @@ fn main()
     let output_folder = "output_images";
     let brotli_archive_path = "compressed_images.brotli";
 
-    println!("Spritezip version 0.1.2\n");
+    println!("Spritezip version 0.1.3\n");
 
     //create input images folder if it doesn't already exist:
     let input_path = Path::new(input_folder);
