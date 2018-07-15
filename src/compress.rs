@@ -278,7 +278,7 @@ where T: std::io::Write,
 
     //Get a cropped version of the image to work on
     let crop_region = cropper.get_crop_region();
-    print!("Sim: {} ", pretty_print_percent(debug_difference_count, original_image.width() as u64 * original_image.height() as u64));
+    print!("Diff: {} ", pretty_print_percent(debug_difference_count, original_image.width() as u64 * original_image.height() as u64));
     print!("CropTL: ({:4},{:4}) ", crop_region.top_left.0, crop_region.top_left.1);
     print!("CropSize: ({:4},{:4}) ", crop_region.dimensions.0, crop_region.dimensions.1);
 

@@ -98,7 +98,7 @@ fn main()
     let output_folder = "output_images";
     let brotli_archive_path = "compressed_images.brotli";
 
-    println!("Spritezip version 0.1.1\n");
+    println!("Spritezip version 0.1.2\n");
 
     //create input images folder if it doesn't already exist:
     let input_path = Path::new(input_folder);
@@ -145,6 +145,7 @@ fn main()
                     oxipng_options.bit_depth_reduction = false;
                     oxipng_options.color_type_reduction = false;
                     oxipng_options.palette_reduction = false;
+                    println!("Oxipng will use {} threads", oxipng_options.threads);
                     Some(oxipng_options)
                 },
                 Err(e) => {
