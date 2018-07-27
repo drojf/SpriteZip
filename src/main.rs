@@ -72,9 +72,9 @@ fn do_verify(input_folder: &str, output_folder: &str)
     }
 }
 
-fn do_alphablend()
+fn do_alphablend(reverse : bool)
 {
-    let num_converted = convert_folder_to_alphablend();
+    let num_converted = convert_folder_to_alphablend(reverse);
     if num_converted == 0
     {
         println!("Please place .png files/folders in the 'input_images' directory. They will be converted and placed in the 'output_images' directory.");
@@ -85,7 +85,7 @@ fn do_alphablend()
 fn print_description_and_exit() -> !
 {
     println!("\n------------------------------- Usage Instructions -------------------------------------");
-    println!("spritezip [compress|extract [0|1|2|3|4|5|6]|verify|selftest|alphablend]");
+    println!("spritezip [compress|extract [0|1|2|3|4|5|6]|verify|selftest|alphablend|undo_alphablend]");
     println!("If you use 'spritezip extract' by itself, .png files are not optimized");
     println!("Specifying a number (2 is recommended) will cause oxipng to optimize the .png files before saving them.");
     println!("For example 'spritezip extract 2' will use level 2 compression (where 0 is fast and largest size, 6 is extremely slow and smallest size)");
@@ -183,7 +183,10 @@ fn main()
             do_verify(input_folder, output_folder);
         },
         Some("alphablend") => {
-            do_alphablend();
+            do_alphablend(false);
+        },
+        Some("undo_alphablend") => {
+            do_alphablend(true);
         },
         Some(_) => {
             print_description_and_exit();

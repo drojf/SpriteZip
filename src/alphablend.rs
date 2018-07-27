@@ -4,8 +4,28 @@ use std::fs;
 
 //nonstandard includes
 use image;
-use image::{RgbImage};
+use image::{RgbImage, RgbaImage};
 use walkdir::WalkDir;
+
+fn convert_alphablend_to_transparent_png(filepath : &str, save_path : &str)
+{
+    let img_dyn = image::open(filepath).unwrap();
+    let img = img_dyn.to_rgba(); //I'm not sure if you can use 'as_rgba8' for 'rgb' images, so just use 'to_rgba8'
+
+    //create new image whose size is half the width of the original image, with a proper alpha channel
+    let transparent_png_width = img.width() / 2;
+    let mut transparent_png = RgbaImage::new(transparent_png_width, img.height());
+
+    for (x, y, pixel) in transparent_png.enumerate_pixels_mut()
+    {
+        let color_pixel = img.get_pixel(x,y);
+        let alpha_pixel = img.get_pixel(x + transparent_png_width, y);
+
+        *pixel = image::Rgba( [color_pixel[0], color_pixel[1], color_pixel[2], 0xFF - alpha_pixel[0]] );
+    }
+
+    transparent_png.save(save_path).unwrap();
+}
 
 fn convert_to_onscripter_alphablend(filepath : &str, save_path : &str)
 {
@@ -33,7 +53,7 @@ fn convert_to_onscripter_alphablend(filepath : &str, save_path : &str)
 }
 
 //TODO: output to 'output_dir' instead of same directory.
-pub fn convert_folder_to_alphablend() -> u32
+pub fn convert_folder_to_alphablend(reverse : bool) -> u32
 {
     let mut count = 0;
     let recursive_path_iter = WalkDir::new("input_images");
@@ -62,7 +82,12 @@ pub fn convert_folder_to_alphablend() -> u32
         //create the save directory if it doesn't already exist:
         fs::create_dir_all(output_path.parent().unwrap()).unwrap();
 
-        convert_to_onscripter_alphablend(ent.path().to_str().unwrap(), &save_path);
+        if reverse{
+            convert_alphablend_to_transparent_png(ent.path().to_str().unwrap(), &save_path);
+        }
+        else {
+            convert_to_onscripter_alphablend(ent.path().to_str().unwrap(), &save_path);
+        }
 
         count += 1;
     }
