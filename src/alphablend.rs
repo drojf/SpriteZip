@@ -73,7 +73,10 @@ pub fn convert_folder_to_alphablend(reverse : bool) -> u32
         let output_path = Path::new("output_images").join(path_with_input_images_as_root);
         println!("output path: {}", output_path.to_str().unwrap());
 
-        let save_path = output_path.to_str().unwrap();
+        //force .png extension, then convert to string
+        let save_path_as_png = output_path.with_extension("png");
+        let save_path = save_path_as_png.to_str().unwrap();
+
         //let file_name_no_ext = ent.path().file_stem().unwrap().to_str().unwrap();
         //let save_path = [file_name_no_ext, ".png"].concat();
 
