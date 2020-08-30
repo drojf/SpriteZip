@@ -6,7 +6,8 @@ Compresses and Decompresses a series of sprite images (as .png files) into a dif
 
 - The program will only compress .png files, and ignore all other files.
 - The program only accepts RGBA .png files, not RGB .png files.
-- It is assumed that the sprites which are similar are in alphabetical order. If the image order is scrambled, the compression will be very poor
+- It is assumed that the sprites which are similar are in alphabetical order. If the image order is scrambled, the compression will be very poor 
+    - **TODO:** Sort images by their perceptual image hash, like the Python `imagehash` library, to group similar images together.
 - This compression assumes that sprites are aligned bottom-center on the image (but does take into account different image sizes). If the sprites are not bottom-center aligned, you will get very poor compression. When compressing, check the difference indicator (`Diff: [percent]`) is as you expect for the images you are compressing.
 - Compression speed depends on similarity of images - if images are not very similar, the compression will be very slow.
 - oxipng can't take raw image data as input, so the raw image needs to be compressed to .png, fed into oxipng, decompressed, then compressed again on final extraction.
