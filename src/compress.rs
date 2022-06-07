@@ -308,7 +308,7 @@ where T: std::io::Write,
         }
         else {
             difference.push(1u8);
-            image_compressor.write(&cropped_pixel.data).unwrap();
+            image_compressor.write(&cropped_pixel.0).unwrap();
         }
     }
 

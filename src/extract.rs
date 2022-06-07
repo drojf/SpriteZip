@@ -1,8 +1,7 @@
 use std;
 use std::fs;
 use std::path::Path;
-use std::io::{Read, Write, SeekFrom, Seek};
-use std::default::Default;
+use std::io::{Read, SeekFrom, Seek};
 
 use brotli;
 use bincode;
@@ -10,7 +9,6 @@ use image;
 use image::{RgbaImage};
 use oxipng;
 use png;
-use png::HasParameters;
 
 use common::{pretty_print_bytes};
 use common::{DecompressionInfo};
@@ -129,7 +127,8 @@ pub fn extract_archive_alt(brotli_archive_path : &str, oxipng_options : Option<o
                 {
                     let ref mut w = std::io::BufWriter::new(&mut unoptimized_png_in_memory);
                     let mut encoder = png::Encoder::new(w, full_image.width(), full_image.height()); // Width is 2 pixels and height is 1.
-                    encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
+                    encoder.set_color(png::ColorType::Rgba);
+                    encoder.set_depth(png::BitDepth::Eight);
                     let mut writer = encoder.write_header().unwrap();
 
                     writer.write_image_data(&full_image.clone().into_raw()).unwrap(); // Save

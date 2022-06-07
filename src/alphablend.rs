@@ -10,7 +10,7 @@ use walkdir::WalkDir;
 fn convert_alphablend_to_transparent_png(filepath : &str, save_path : &str)
 {
     let img_dyn = image::open(filepath).unwrap();
-    let img = img_dyn.to_rgba(); //I'm not sure if you can use 'as_rgba8' for 'rgb' images, so just use 'to_rgba8'
+    let img = img_dyn.to_rgba8(); //I'm not sure if you can use 'as_rgba8' for 'rgb' images, so just use 'to_rgba8'
 
     //create new image whose size is half the width of the original image, with a proper alpha channel
     let transparent_png_width = img.width() / 2;

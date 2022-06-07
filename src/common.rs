@@ -10,7 +10,7 @@ use std::fs;
 use std::io::BufReader;
 use std::io::{Read, Write};
 use brotli;
-use number_prefix::{decimal_prefix, Standalone, Prefixed};
+use number_prefix::NumberPrefix;
 
 pub const FILE_FORMAT_HEADER_LENGTH: usize = 8;
 pub const BROTLI_BUFFER_SIZE: usize = 4096; //buffer size used for compression and decompression
@@ -48,9 +48,9 @@ pub struct CompressedImageInfo {
 
 pub fn pretty_print_bytes(value : f64) -> String
 {
-    match decimal_prefix(value as f64) {
-        Standalone(bytes)   => format!("{} bytes", bytes),
-        Prefixed(prefix, n) => format!("{:.2} {}B", n, prefix),
+    match NumberPrefix::decimal(value as f64) {
+        NumberPrefix::Standalone(bytes)   => format!("{} bytes", bytes),
+        NumberPrefix::Prefixed(prefix, n) => format!("{:.2} {}B", n, prefix),
     }
 }
 
@@ -93,7 +93,7 @@ impl<'s> FileTypeIterator<'s> {
 }
 
 impl<'s> Iterator for FileTypeIterator<'s>  {
-type Item = (walkdir::DirEntry);
+type Item = walkdir::DirEntry;
 	fn next(&mut self) -> Option<Self::Item>
     {
         loop {
@@ -134,14 +134,14 @@ pub fn verify_images(input_folder : &str, output_folder : &str) -> VerificationR
     for (img_count, ent) in FileTypeIterator::new(input_folder, "png").enumerate()
     {
         //load input and output images
-        let input_image_raw = image::open(ent.path()).unwrap().raw_pixels();
+        let input_image_raw = image::open(ent.path()).unwrap().to_rgba8().into_raw();
 
         let path_relative_to_input_folder = ent.path().strip_prefix(input_folder).unwrap();
         let output_folder_image_path = Path::new(output_folder).join(path_relative_to_input_folder);
 
         match image::open(&output_folder_image_path) {
             Ok(output_image) =>  {
-                let output_image_raw = output_image.raw_pixels();
+                let output_image_raw = output_image.to_rgba8().into_raw();
 
                 println!("Comparing '{}' against '{}'...", ent.path().to_str().unwrap(), output_folder_image_path.to_str().unwrap());
 
@@ -229,7 +229,7 @@ pub fn u8_buf_to_u32_big_endian(buf : &[u8; 4]) -> u32
 }
 
 //convert 4 bytes from a stream into a u32 value, big endian
-pub fn u8_stream_to_u32_big_endian(reader : &mut Read) -> u32
+pub fn u8_stream_to_u32_big_endian(reader : &mut dyn Read) -> u32
 {
     let mut png_width_bytes  = [0u8; 4];
     reader.read_exact(&mut png_width_bytes).unwrap();
@@ -237,7 +237,7 @@ pub fn u8_stream_to_u32_big_endian(reader : &mut Read) -> u32
 }
 
 /// Read the width and height of a .png file
-pub fn get_png_dimensions(reader : &mut Read) -> Result<(u32, u32), &'static str>
+pub fn get_png_dimensions(reader : &mut dyn Read) -> Result<(u32, u32), &'static str>
 {
     let reference_png_header : [u8; 16] = [
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, //PNG header (always the same)

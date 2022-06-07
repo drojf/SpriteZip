@@ -139,13 +139,11 @@ fn main()
                     println!("INFO: Note: optimization levels are from 0 (fast, low comp) to 6 (slow, high comp). Level 2 is recommended. Values higher than 6 will be the same as level 6");
                     println!("See the oxipng documentation for more details.");
                     let mut oxipng_options = oxipng::Options::from_preset(optimization_level);
-                    oxipng_options.verbosity = if debug_mode { Some(0) } else { None }; //supress oxipng printing unless in debug mode
                     oxipng_options.interlace = Some(0);                                 //remove any interlacing from image
                     //don't try to change bit depth/color type/palette in case it breaks the game where the sprite is used
                     oxipng_options.bit_depth_reduction = false;
                     oxipng_options.color_type_reduction = false;
                     oxipng_options.palette_reduction = false;
-                    println!("Oxipng will use {} threads", oxipng_options.threads);
                     Some(oxipng_options)
                 },
                 Err(e) => {
